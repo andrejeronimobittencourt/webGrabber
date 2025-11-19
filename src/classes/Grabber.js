@@ -1,64 +1,18 @@
-import cloneDeep from 'lodash/cloneDeep.js'
 import GrabListFactory from './GrabList.js'
 import PuppeteerPageFactory from './wrappers/Puppeteer.js'
 import { ActionListContainer } from './actions/Actions.js'
 import CoreActionList from './actions/CoreActionList.js'
 import CustomActionList from './actions/CustomActionList.js'
+import BrainFactory from './Brain.js'
 import {
 	getGrabList,
 	displayError,
 	displayErrorAndExit,
 	displayText,
 	resetIndentation,
+	parseModeAndGrabName,
 } from '../utils/utils.js'
 import constants from '../utils/constants.js'
-
-class Brain {
-	#memory
-	#muscleMemory
-
-	constructor() {
-		this.#memory = new Map()
-	}
-
-	learn(key, value) {
-		if (key === constants.pagesKey || key === constants.activePageKey) this.#memory.set(key, value)
-		else if (typeof value === 'object') this.#memory.set(key, cloneDeep(value))
-		else this.#memory.set(key, value)
-	}
-	recall(key) {
-		return this.#memory.get(key)
-	}
-	forget(key) {
-		this.#memory.delete(key)
-	}
-	sync(memories) {
-		memories.forEach((value, key) => this.learn(key, value))
-	}
-	mimic(actions) {
-		this.#muscleMemory = actions
-	}
-	async perform(name, page) {
-		await this.#muscleMemory.run(name, this, page)
-	}
-}
-
-class BrainFactory {
-	static #memories
-	static #actions
-
-	static init(memories, actions) {
-		this.#memories = memories
-		this.#actions = actions
-	}
-
-	static create() {
-		const brain = new Brain()
-		brain.sync(this.#memories)
-		brain.mimic(this.#actions)
-		return brain
-	}
-}
 
 export default class Grabber {
 	#coreActionList
@@ -70,14 +24,10 @@ export default class Grabber {
 	}
 
 	addCustomAction(name, action) {
-		try {
-			if (typeof action !== 'function') throw new Error(`Action ${name} must be a function`)
-			if (this.#coreActionList.has(name) || this.#customActionList.has(name))
-				throw new Error(`Action ${name} already exists`)
-			this.#customActionList.add(name, action)
-		} catch (error) {
-			displayErrorAndExit(error)
-		}
+		if (typeof action !== 'function') displayErrorAndExit(`Action ${name} must be a function`)
+		if (this.#coreActionList.has(name) || this.#customActionList.has(name))
+			displayErrorAndExit(`Action ${name} already exists`)
+		this.#customActionList.add(name, action)
 	}
 
 	async init(puppeteerOptions) {
@@ -112,15 +62,18 @@ export default class Grabber {
 	}
 
 	async grab(payload = null) {
+		const { helpMode, grabName } = parseModeAndGrabName()
 		const brain = BrainFactory.create()
 		const grabList = GrabListFactory.create()
 		if (payload) {
 			grabList.add(payload.body)
 			brain.learn(constants.payloadIdKey, payload.id)
-		} else await this.loadGrabList(grabList)
+		} else {
+			await this.loadGrabList(grabList)
+			if (grabName && !grabList.has(grabName))
+				displayErrorAndExit(new Error(`Grab ${grabName} not found`))
+		}
 		try {
-			const [mode, grabName] = process.argv.slice(2)
-			const helpMode = mode === 'help'
 			if (!helpMode) {
 				const defaultPage = await PuppeteerPageFactory.create()
 				const pages = { default: defaultPage }
@@ -129,12 +82,18 @@ export default class Grabber {
 			}
 			const asyncActions = []
 			for (const grab of grabList.list) {
-				if (helpMode && grabName === grab.name)
-					displayText([
-						{ text: 'Description : ', color: 'blue', style: 'bold' },
-						{ text: grab.description, color: 'whiteBright' },
-					])
-				if (helpMode || (grabName && grabName !== grab.name && !payload)) continue
+				if (helpMode) {
+					if (!grabName || grabName === grab.name) {
+						displayText([
+							{ text: 'Grab : ', color: 'blue', style: 'bold' },
+							{ text: grab.name + '\n', color: 'whiteBright' },
+							{ text: 'Description : ', color: 'blue', style: 'bold' },
+							{ text: grab.description, color: 'whiteBright' },
+						])
+					}
+					continue
+				}
+				if (grabName && grabName !== grab.name && !payload) continue
 				displayText([{ text: `Grabbing ${grab.name}`, color: 'green', style: 'bold' }])
 				resetIndentation(brain)
 				brain.learn(constants.paramsKey, { dir: grab.name })
@@ -154,8 +113,10 @@ export default class Grabber {
 			displayError(error)
 		}
 		const pages = brain.recall(constants.pagesKey)
-		for (const key in pages) {
-			await pages[key].close()
+		if (pages) {
+			for (const key in pages) {
+				await pages[key].close()
+			}
 		}
 		displayText([{ text: 'Grabber finished', color: 'green', style: 'bold' }])
 		if (!payload) {

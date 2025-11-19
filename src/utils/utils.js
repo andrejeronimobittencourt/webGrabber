@@ -114,6 +114,15 @@ export const interpolation = (params, brain) => {
 	return newParams
 }
 
+export const parseModeAndGrabName = () => {
+	const args = process.argv.slice(2)
+	const helpMode = args.includes('--help')
+	return {
+		helpMode,
+		grabName: args.find((arg) => !arg.startsWith('-')),
+	}
+}
+
 export const welcomePage = (port) => `
 <!DOCTYPE html>
 <html lang="en">

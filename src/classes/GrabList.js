@@ -40,6 +40,10 @@ class GrabList {
 	add(grab) {
 		this.#list.push(new Grab(grab))
 	}
+
+	has(grabName) {
+		return this.#list.some((grab) => grab.name === grabName)
+	}
 }
 
 export default class GrabListFactory {

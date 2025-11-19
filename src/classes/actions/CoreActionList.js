@@ -142,25 +142,29 @@ export default class CoreActionList extends ActionList {
 			}
 		})
 		super.add('puppeteer', async (brain, page) => {
-			const { func, func2, ...rest } = brain.recall(constants.paramsKey)
-			displayText(
-				[
-					{ text: ': Puppeteer ', color: 'white', style: 'italic' },
-					{ text: func, color: 'gray', style: 'italic' },
-					{ text: func2 ? '.' + func2 : '', color: 'gray', style: 'italic' },
-				],
-				brain,
-			)
-			if (func === 'newPage') {
-				brain.learn(constants.paramsKey, { pageKey: uuidv4() })
-				await brain.perform('newPage')
-				return
+			try {
+				const { func, func2, ...rest } = brain.recall(constants.paramsKey)
+				displayText(
+					[
+						{ text: ': Puppeteer ', color: 'white', style: 'italic' },
+						{ text: func, color: 'gray', style: 'italic' },
+						{ text: func2 ? '.' + func2 : '', color: 'gray', style: 'italic' },
+					],
+					brain,
+				)
+				if (func === 'newPage') {
+					brain.learn(constants.paramsKey, { pageKey: uuidv4() })
+					await brain.perform('newPage')
+					return
+				}
+				const params = Object.values(rest)
+				brain.learn(
+					constants.inputKey,
+					func2 ? await page[func][func2](...params) : await page[func](...params),
+				)
+			} catch (error) {
+				throw new Error('Puppeteer function not found')
 			}
-			const params = Object.values(rest)
-			brain.learn(
-				constants.inputKey,
-				func2 ? await page[func][func2](...params) : await page[func](...params),
-			)
 		})
 		super.add('userInput', async (brain) => {
 			const { query } = brain.recall(constants.paramsKey)

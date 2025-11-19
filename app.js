@@ -37,12 +37,9 @@ const startServerMode = async () => {
 	)
 }
 
-// Determine the mode based on the command-line argument
-const argv = process.argv.slice(2)[0]
-
 const grabber = new Grabber()
 customize(grabber)
 await grabber.init(options)
 
-if (argv === 'server') await startServerMode()
+if (process.argv.includes('--server')) await startServerMode()
 else await grabber.grab()
