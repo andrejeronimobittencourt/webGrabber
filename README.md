@@ -24,9 +24,9 @@ webGrabber is a config-based web scraper and browser automation tool powered by 
 	- [Actions](#actions)
 		- [Built-in actions](#built-in-actions)
 		- [Custom actions](#custom-actions)
-        - [Environment Variables](#environment-variables)
-        - [Puppeteer Options](#puppeteer-options)
-        - [Chromium and Browser Path](#chromium-and-browser-path)
+	- [Environment Variables](#environment-variables)
+	- [Puppeteer Options](#puppeteer-options)
+	- [Chromium and Browser Path](#chromium-and-browser-path)
 	- [License](#license)
 
 ## Features
@@ -142,7 +142,7 @@ Extend behavior by defining actions in [`src/config/custom.js`](src/config/custo
 Place a `.env` file in the project root or export variables in your shell. All variables with the `GRABBER_` prefix are automatically loaded into memory and available for [memory interpolation](#memory-interpolation).
 
 ## Puppeteer Options
-Configure Puppeteer launch settings in [`src/config/options.js`](src/config/options.js). The exported object is passed directly to `puppeteer.launch` and supports [all Puppeteer launch options](https://pptr.dev/api/puppeteerlaunchoptions/). Example:
+Configure Puppeteer launch settings in [`src/config/options.js`](src/config/options.js). The exported object is passed directly to `puppeteer.launch` and supports [all Puppeteer launch options](https://pptr.dev/api/puppeteer.launchoptions). Example:
 
 ```js
 export default {
