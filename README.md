@@ -7,24 +7,26 @@
 webGrabber is a config-based web scraper and browser automation tool powered by Puppeteer. It lets you describe scraping or automation tasks as declarative “grabs” (JSON or YAML) that chain reusable actions. Runs can execute locally or via a lightweight HTTP server, with flexible environment variable injection and memory interpolation to keep configurations portable.
 
 ## Table of Contents
-- [Features](#features)
-- [Prerequisites](#prerequisites)
-- [Installation](#installation)
-- [Quickstart](#quickstart)
-  - [Create a grab](#create-a-grab)
-  - [Run locally](#run-locally)
-  - [Run a specific grab](#run-a-specific-grab)
-  - [Run in server mode](#run-in-server-mode)
-- [Grab Configuration Reference](#grab-configuration-reference)
-  - [Memory interpolation](#memory-interpolation)
-  - [Returning values between actions](#returning-values-between-actions)
-  - [Reserved variable names](#reserved-variable-names)
-- [Actions](#actions)
-  - [Built-in actions](#built-in-actions)
-  - [Custom actions](#custom-actions)
-- [Environment Variables](#environment-variables)
-- [Chromium and Browser Path](#chromium-and-browser-path)
-- [License](#license)
+- [webGrabber](#webgrabber)
+	- [Table of Contents](#table-of-contents)
+	- [Features](#features)
+	- [Prerequisites](#prerequisites)
+	- [Installation](#installation)
+	- [Quickstart](#quickstart)
+		- [Create a grab](#create-a-grab)
+		- [Run locally](#run-locally)
+		- [Run a specific grab](#run-a-specific-grab)
+		- [Run in server mode](#run-in-server-mode)
+	- [Grab Configuration Reference](#grab-configuration-reference)
+		- [Memory interpolation](#memory-interpolation)
+		- [Returning values between actions](#returning-values-between-actions)
+		- [Reserved variable names](#reserved-variable-names)
+	- [Actions](#actions)
+		- [Built-in actions](#built-in-actions)
+		- [Custom actions](#custom-actions)
+	- [Environment Variables](#environment-variables)
+	- [Chromium and Browser Path](#chromium-and-browser-path)
+	- [License](#license)
 
 ## Features
 - **Declarative grabs:** Author scraping or automation workflows as JSON/YAML files in `src/grabs`.
@@ -152,6 +154,8 @@ export default {
   executablePath: '/path/to/Chrome',
 };
 ```
+The same `src/config/options.js` file is the place to define any Puppeteer launch options for your environment (for example, 
+`headless`, `args`, or proxy configuration).
 
 ## License
 
