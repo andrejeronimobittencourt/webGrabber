@@ -1,6 +1,6 @@
 {
   "name": "@andrejcbittencourt/webgrabber",
-  "version": "4.1.11",
+  "version": "4.1.12",
   "description": "Config based web scraper & browser automation",
   "main": "app.js",
   "type": "module",
@@ -27,7 +27,7 @@
     "express": "^5.1.0",
     "js-yaml": "^4.1.1",
     "lodash": "^4.17.21",
-    "puppeteer": "^24.30.0",
+    "puppeteer": "^24.31.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-adblocker": "^2.13.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
