@@ -24,8 +24,9 @@ webGrabber is a config-based web scraper and browser automation tool powered by 
 	- [Actions](#actions)
 		- [Built-in actions](#built-in-actions)
 		- [Custom actions](#custom-actions)
-	- [Environment Variables](#environment-variables)
-	- [Chromium and Browser Path](#chromium-and-browser-path)
+        - [Environment Variables](#environment-variables)
+        - [Puppeteer Options](#puppeteer-options)
+        - [Chromium and Browser Path](#chromium-and-browser-path)
 	- [License](#license)
 
 ## Features
@@ -140,6 +141,22 @@ Extend behavior by defining actions in [`src/config/custom.js`](src/config/custo
 ## Environment Variables
 Place a `.env` file in the project root or export variables in your shell. All variables with the `GRABBER_` prefix are automatically loaded into memory and available for [memory interpolation](#memory-interpolation).
 
+## Puppeteer Options
+Configure Puppeteer launch settings in [`src/config/options.js`](src/config/options.js). The exported object is passed directly to `puppeteer.launch` and supports [all Puppeteer launch options](https://pptr.dev/api/puppeteerlaunchoptions/). Example:
+
+```js
+export default {
+  headless: 'new',
+  args: ['--no-sandbox'],
+  executablePath: '/path/to/Chrome',
+  viewport: { width: 1280, height: 720 },
+  stealth: true, // enables puppeteer-extra-plugin-stealth
+  adblocker: true, // enables puppeteer-extra-plugin-adblocker
+};
+```
+
+`stealth` and `adblocker` toggle the corresponding `puppeteer-extra` plugins before launching the browser. Any keys not needed by your setup can be removed; the file is the single place to adapt Puppeteer to your environment.
+
 ## Chromium and Browser Path
 If Puppeteer cannot find Chromium on macOS, install it explicitly:
 
@@ -154,8 +171,6 @@ export default {
   executablePath: '/path/to/Chrome',
 };
 ```
-The same `src/config/options.js` file is the place to define any Puppeteer launch options for your environment (for example, 
-`headless`, `args`, or proxy configuration).
 
 ## License
 
