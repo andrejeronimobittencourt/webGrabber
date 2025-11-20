@@ -4,127 +4,154 @@
 
 # webGrabber
 
-webGrabber is a config-based web scraper and browser automation tool that makes it easy to extract data from websites and automate repetitive browsing tasks. With its flexible and powerful set of features, including custom actions, memory interpolation, and the ability to run specific grabs, webGrabber is the perfect solution for streamlining your web scraping and browser automation needs. Whether you are a data analyst, researcher, or web developer, webGrabber has something to offer for everyone.
+webGrabber is a config-based web scraper and browser automation tool powered by Puppeteer. It lets you describe scraping or automation tasks as declarative “grabs” (JSON or YAML) that chain reusable actions. Runs can execute locally or via a lightweight HTTP server, with flexible environment variable injection and memory interpolation to keep configurations portable.
+
+## Table of Contents
+- [Features](#features)
+- [Prerequisites](#prerequisites)
+- [Installation](#installation)
+- [Quickstart](#quickstart)
+  - [Create a grab](#create-a-grab)
+  - [Run locally](#run-locally)
+  - [Run a specific grab](#run-a-specific-grab)
+  - [Run in server mode](#run-in-server-mode)
+- [Grab Configuration Reference](#grab-configuration-reference)
+  - [Memory interpolation](#memory-interpolation)
+  - [Returning values between actions](#returning-values-between-actions)
+  - [Reserved variable names](#reserved-variable-names)
+- [Actions](#actions)
+  - [Built-in actions](#built-in-actions)
+  - [Custom actions](#custom-actions)
+- [Environment Variables](#environment-variables)
+- [Chromium and Browser Path](#chromium-and-browser-path)
+- [License](#license)
+
+## Features
+- **Declarative grabs:** Author scraping or automation workflows as JSON/YAML files in `src/grabs`.
+- **Reusable actions:** Chain built-in actions for navigation, extraction, and logging, or add custom actions to extend behavior.
+- **Memory interpolation:** Inject environment-derived values (`GRABBER_*`) directly into configs with `{{variable}}` syntax.
+- **Local and server modes:** Execute all grabs locally or expose a `/grab` HTTP endpoint for on-demand runs.
+- **Per-run flexibility:** Target specific grabs, pass request payloads, and use returned values across action steps.
+
+## Prerequisites
+- Node.js (version defined in the project `.nvmrc` or your system Node 18+ recommended)
+- npm (bundled with Node)
+- Chromium/Chrome available to Puppeteer (see [Chromium and Browser Path](#chromium-and-browser-path))
 
 ## Installation
+Install dependencies from the project root:
 
 ```bash
 npm install
 ```
 
-## Chromium on Mac
+## Quickstart
 
-If you have trouble with chromium on Mac, you can try to install it using:
+### Create a grab
+Place a JSON, YML, or YAML file in `src/grabs`. The `name` becomes the grab identifier, and `actions` is an ordered list of steps.
 
-```bash
-npx puppeteer browsers install chrome
-```
-
-Or you can add the executable path to Chrome in the options passed to Puppeteer through Grabber using the [options](src/config/options.js) file:
-
-```js
-export default {
-	executablePath: '/path/to/Chrome',
-}
-```
-
-## Usage
-
-Create a grab config (json|yml|yaml) file in the _src/grabs_ directory of the project
-
-Hello World example: _hello-world.json_
-
+**hello-world.json**
 ```json
 {
-	"name": "hello-world",
-	"actions": [
-		{
-			"name": "log",
-			"params": {
-				"text": "Hello World!"
-			}
-		}
-	]
+  "name": "hello-world",
+  "actions": [
+    {
+      "name": "log",
+      "params": {
+        "text": "Hello World!"
+      }
+    }
+  ]
 }
 ```
 
-Hello World example: _hello-world.yml_
-
+**hello-world.yml**
 ```yml
 name: hello-world
 actions:
   - name: log
     params:
-      text: 'Hello World!'
+      text: "Hello World!"
 ```
 
-## Running the Application
-
-### Local Mode
-
-Run the app and all the grabs in the _src/grabs_ directory will be executed:
+### Run locally
+Execute every grab located in `src/grabs`:
 
 ```bash
 npm run start
 ```
 
-Run a specific grab:
+### Run a specific grab
+Target one grab by name:
 
 ```bash
 npm run start hello-world
 ```
 
-### Server Mode
-
-Run the app in server mode to start an HTTP server and receive grab configurations via API requests.
-In server mode, the application exposes an HTTP POST endpoint to accept JSON payloads for grab configurations.
+### Run in server mode
+Start the HTTP server to accept grab configurations via POST requests. The server listens on `PORT` (default `3000`).
 
 ```bash
 npm run start:server
 ```
 
-#### Endpoint Details
+Send a JSON grab configuration to trigger a run:
 
-- **Endpoint**: `/grab`
-- **Method**: POST
-- **Payload**: The endpoint expects a JSON payload containing the grab configuration.
-- **Server Port**: The server runs on the port specified in the `PORT` environment variable, with a default fallback to port 3000 if not set.
+- **Endpoint:** `POST /grab`
+- **Payload:** Grab configuration JSON (same shape as files in `src/grabs`).
 
-Send a POST request with a JSON payload to this endpoint to trigger the grab process.
+Example (using `curl`):
+```bash
+curl -X POST http://localhost:3000/grab \
+  -H "Content-Type: application/json" \
+  -d '{"name":"hello-world","actions":[{"name":"log","params":{"text":"Hello World!"}}]}'
+```
+
+## Grab Configuration Reference
+
+### Memory interpolation
+Environment variables prefixed with `GRABBER_` are loaded into memory and accessible in grab files using `{{variable}}` syntax. Define them in a `.env` file at the project root or your shell environment. Actions can also create or update variables during a run (for example, via `setVariable`, `appendToVariable`, or counter actions), and those variables can be interpolated in later steps with the same `{{variable}}` syntax. Each action’s parameters are re-evaluated for interpolation at runtime, so newly learned values are immediately available to subsequent steps.
+
+### Returning values between actions
+Actions can return values for downstream steps using the `INPUT` keyword. Each subsequent action can reference `INPUT` to consume the previous action's output.
+
+### Reserved variable names
+Use these identifiers with care in configs, as they are managed by the runtime:
+
+- `INPUT`
+- `PARAMS`
+- `INDENTATION`
+- `CURRENT_DIR`
+- `BASE_DIR`
+- `PAYLOAD_ID`
+- `PAGES`
+- `ACTIVE_PAGE`
 
 ## Actions
 
-A full list of actions can be found in [Actions](src/classes/actions/README.md)
+### Built-in actions
+Browse the catalog of available actions and their parameters in [Actions](src/classes/actions/README.md).
 
-## Custom Actions
-
-An example of how to add custom actions is found in the [custom](src/config/custom.js) file
+### Custom actions
+Extend behavior by defining actions in [`src/config/custom.js`](src/config/custom.js). Custom actions can be referenced from grab files like built-ins.
 
 ## Environment Variables
+Place a `.env` file in the project root or export variables in your shell. All variables with the `GRABBER_` prefix are automatically loaded into memory and available for [memory interpolation](#memory-interpolation).
 
-Environment variables can be set in a _.env_ file in the root of the project<br>
-All variables prepended with _GRABBER\__ will be loaded into the memory and can be accessed in the config files
+## Chromium and Browser Path
+If Puppeteer cannot find Chromium on macOS, install it explicitly:
 
-## Memory Interpolation
+```bash
+npx puppeteer browsers install chrome
+```
 
-The memory can be accessed in the config files using the _{{variable}}_ syntax
+Alternatively, set the executable path in [`src/config/options.js`](src/config/options.js):
 
-## Return From Action
-
-An action can return a value that can be used in the next action by using the _INPUT_ keyword
-
-## Reserved Variable Names
-
-The following variable names are reserved and should be used in the config files with caution:
-
-- _INPUT_
-- _PARAMS_
-- _INDENTATION_
-- _CURRENT_DIR_
-- _BASE_DIR_
-- _PAYLOAD_ID_
-- _PAGES_
-- _ACTIVE_PAGE_
+```js
+export default {
+  executablePath: '/path/to/Chrome',
+};
+```
 
 ## License
 
