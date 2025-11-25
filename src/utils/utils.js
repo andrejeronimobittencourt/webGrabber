@@ -1,13 +1,13 @@
 import yaml from 'js-yaml'
 import Chalk from '../classes/wrappers/Chalk.js'
-import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
-import { dirname } from 'path'
 import constants from './constants.js'
+import { FileSystem } from './fileSystem.js'
+import { grabSchema, formatGrabValidationError } from '../schemas/grabSchema.js'
 
 const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
+const __dirname = path.dirname(__filename)
 
 const TABSIZE = 2
 
@@ -19,37 +19,58 @@ export const basePathJoin = (...paths) => {
 	return pathJoin(__dirname, ...paths)
 }
 
-export const fsOperation = (operation, location, ...args) => {
-	const path = pathJoin(location)
-	if (typeof fs[operation] === 'function') {
-		return fs[operation](path, ...args)
-	}
-	throw new Error(`Invalid fs operation: ${operation}`)
-}
-
 // get all grab configs from grabs folder
-export const getGrabList = () => {
-	const files = fsOperation(constants.fsMethods.readdir, basePathJoin('../grabs'), 'utf8')
+export const getGrabList = async () => {
+	const grabsPath = basePathJoin('../grabs')
+	const files = await FileSystem.readdir(grabsPath)
 	const grabList = []
-	files.forEach((file) => {
+
+	for (const file of files) {
 		try {
 			let doc
-			// if file has .yml or .yaml extension
-			if (file.split('.').pop() === 'yml' || file.split('.').pop() === 'yaml')
-				doc = yaml.load(
-					fsOperation(constants.fsMethods.readFile, basePathJoin(`../grabs/${file}`), 'utf8'),
+			const ext = file.split('.').pop()
+			const filePath = pathJoin(grabsPath, file)
+
+			if (ext === 'yml' || ext === 'yaml') {
+				const content = await FileSystem.readFile(filePath, 'utf8')
+				doc = yaml.load(content)
+			} else if (ext === 'json') {
+				const content = await FileSystem.readFile(filePath, 'utf8')
+				doc = JSON.parse(content)
+			} else {
+				continue
+			}
+
+			const result = grabSchema.safeParse(doc)
+			if (!result.success) {
+				console.warn(Chalk.create([
+					{ text: `Warning: Invalid grab config in ${file}:\n`, color: 'yellow', style: 'bold' },
+					{ text: formatGrabValidationError(result.error), color: 'red' }
+				]))
+				continue
+			}
+
+			// Use parsed data
+			doc = result.data
+
+			if (grabList.some((g) => g.name === doc.name)) {
+				console.warn(
+					Chalk.create([
+						{
+							text: `Warning: Duplicate grab name '${doc.name}' in ${file}. Skipping.`,
+							color: 'yellow',
+							style: 'bold',
+						},
+					]),
 				)
-			// if file has .json extension
-			else if (file.split('.').pop() === 'json')
-				doc = JSON.parse(
-					fsOperation(constants.fsMethods.readFile, basePathJoin(`../grabs/${file}`), 'utf8'),
-				)
-			else return
+				continue
+			}
+
 			grabList.push(doc)
 		} catch (e) {
 			displayErrorAndExit(e)
 		}
-	})
+	}
 	return grabList
 }
 
@@ -59,6 +80,9 @@ export const displayError = (error) => {
 
 export const displayErrorAndExit = (error) => {
 	displayError(error)
+	if (process.env.NODE_ENV === 'test') {
+		throw error
+	}
 	process.exit(1)
 }
 

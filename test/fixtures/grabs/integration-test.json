@@ -1,0 +1,52 @@
+{
+	"name": "integration-test",
+	"description": "Integration test for webGrabber",
+	"actions": [
+		{
+			"name": "setBaseDir",
+			"params": {
+				"dir": "integration_test"
+			}
+		},
+		{
+			"name": "puppeteer",
+			"params": {
+				"func": "goto",
+				"url": "http://localhost:3333"
+			}
+		},
+		{
+			"name": "type",
+			"params": {
+				"selector": "#input-field",
+				"text": "Hello World"
+			}
+		},
+		{
+			"name": "click",
+			"params": {
+				"selector": "#submit-btn"
+			}
+		},
+		{
+			"name": "sleep",
+			"params": {
+				"ms": 100
+			}
+		},
+		{
+			"name": "setVariable",
+			"params": {
+				"key": "TEST_VAR",
+				"value": "success"
+			}
+		},
+		{
+			"name": "saveToText",
+			"params": {
+				"key": "TEST_VAR",
+				"filename": "result"
+			}
+		}
+	]
+}

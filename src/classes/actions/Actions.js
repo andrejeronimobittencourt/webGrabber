@@ -1,5 +1,7 @@
 import { interpolation, displayText } from '../../utils/utils.js'
 import constants from '../../utils/constants.js'
+import { validateActionParams } from '../../schemas/actionSchemas.js'
+import logger from '../../utils/logger.js'
 
 class Action {
 	#action
@@ -31,6 +33,10 @@ export class ActionList {
 	}
 
 	async run(name, brain, page) {
+		const startTime = Date.now()
+
+		logger.debug(`Starting action: ${name}`)
+
 		displayText(
 			[
 				{ text: 'Running action : ', color: 'blue', style: 'bold' },
@@ -38,9 +44,45 @@ export class ActionList {
 			],
 			brain,
 		)
-		if (brain.recall(constants.paramsKey))
-			brain.learn(constants.paramsKey, interpolation(brain.recall(constants.paramsKey), brain))
-		await this.#list.get(name).run(brain, page)
+
+		if (brain.recall(constants.paramsKey)) {
+			let params = brain.recall(constants.paramsKey)
+
+			// First interpolate variables
+			params = interpolation(params, brain)
+
+			// Then validate parameters
+			try {
+				params = validateActionParams(name, params)
+			} catch (validationError) {
+				logger.error('Parameter validation failed', {
+					action: name,
+					error: validationError.message,
+				})
+				throw validationError
+			}
+
+			brain.learn(constants.paramsKey, params)
+		}
+
+		try {
+			await this.#list.get(name).run(brain, page)
+
+			const duration = Date.now() - startTime
+			logger.info('Action completed', {
+				action: name,
+				duration: `${duration}ms`,
+			})
+		} catch (error) {
+			const duration = Date.now() - startTime
+			logger.error('Action failed', {
+				action: name,
+				duration: `${duration}ms`,
+				error: error.message,
+				stack: error.stack,
+			})
+			throw error
+		}
 	}
 }
 
