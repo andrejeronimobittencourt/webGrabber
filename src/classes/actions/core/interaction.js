@@ -1,5 +1,6 @@
 import constants from '../../../utils/constants.js'
-import { displayText, incrementIndentation, decrementIndentation, pathJoin } from '../../../utils/utils.js'
+import { displayText, incrementIndentation, decrementIndentation } from '../../../utils/display.js'
+import { pathJoin } from '../../../utils/paths.js'
 import { FileSystem } from '../../../utils/fileSystem.js'
 import { SelectorError, NetworkError } from '../../../errors/ActionErrors.js'
 import { retryWithBackoff, isRetryableError } from '../../../utils/retry.js'

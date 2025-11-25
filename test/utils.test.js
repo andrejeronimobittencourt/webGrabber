@@ -3,16 +3,17 @@ import assert from 'node:assert'
 import path from 'path'
 import { fileURLToPath } from 'url'
 import {
-	pathJoin,
-	basePathJoin,
-	sanitizeString,
 	interpolation,
-	resetIndentation,
+	sanitizeString,
+} from '../src/utils/utils.js'
+import { pathJoin, basePathJoin } from '../src/utils/paths.js'
+import {
+	displayText,
 	incrementIndentation,
 	decrementIndentation,
-	displayText,
-	getGrabList,
-} from '../src/utils/utils.js'
+	resetIndentation,
+} from '../src/utils/display.js'
+import { getGrabList } from '../src/utils/grabLoader.js'
 import { FileSystem } from '../src/utils/fileSystem.js'
 import constants from '../src/utils/constants.js'
 

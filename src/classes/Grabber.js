@@ -4,14 +4,14 @@ import { ActionListContainer } from './actions/Actions.js'
 import CoreActionList from './actions/CoreActionList.js'
 import CustomActionList from './actions/CustomActionList.js'
 import BrainFactory from './Brain.js'
+import { getGrabList } from '../utils/grabLoader.js'
 import {
-	getGrabList,
 	displayError,
 	displayErrorAndExit,
 	displayText,
 	resetIndentation,
-	parseModeAndGrabName,
-} from '../utils/utils.js'
+} from '../utils/display.js'
+import { parseModeAndGrabName } from '../utils/utils.js'
 import constants from '../utils/constants.js'
 
 export default class Grabber {

@@ -1,5 +1,6 @@
 import constants from '../../../utils/constants.js'
-import { incrementIndentation, decrementIndentation, displayText, sanitizeString } from '../../../utils/utils.js'
+import { incrementIndentation, decrementIndentation, displayText } from '../../../utils/display.js'
+import { sanitizeString } from '../../../utils/utils.js'
 import { safeEvaluate, validateExpression } from '../../../utils/safeEvaluator.js'
 
 export default class ControlActions {

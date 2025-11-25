@@ -71,4 +71,62 @@ export const createLogger = (context = {}) => {
 	return logger.child(context)
 }
 
+/**
+ * Log action execution
+ */
+export const logAction = (actionName, metadata = {}) => {
+	logger.info(`Action: ${actionName}`, {
+		action: actionName,
+		...metadata,
+	})
+}
+
+/**
+ * Log action error
+ */
+export const logActionError = (actionName, error, metadata = {}) => {
+	logger.error(`Action failed: ${actionName}`, {
+		action: actionName,
+		error: error.message,
+		stack: error.stack,
+		...metadata,
+	})
+}
+
+/**
+ * Log grab execution start
+ */
+export const logGrabStart = (grabName, requestId) => {
+	logger.info('Grab execution started', {
+		grabName,
+		requestId,
+		event: 'grab_start',
+	})
+}
+
+/**
+ * Log grab execution completion
+ */
+export const logGrabComplete = (grabName, requestId, duration) => {
+	logger.info('Grab execution completed', {
+		grabName,
+		requestId,
+		duration,
+		event: 'grab_complete',
+	})
+}
+
+/**
+ * Log grab execution failure
+ */
+export const logGrabError = (grabName, requestId, error) => {
+	logger.error('Grab execution failed', {
+		grabName,
+		requestId,
+		error: error.message,
+		stack: error.stack,
+		event: 'grab_error',
+	})
+}
+
 export default logger

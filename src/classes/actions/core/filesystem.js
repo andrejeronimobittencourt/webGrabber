@@ -1,5 +1,7 @@
 import constants from '../../../utils/constants.js'
-import { displayText, sanitizeString, pathJoin, basePathJoin } from '../../../utils/utils.js'
+import { displayText } from '../../../utils/display.js'
+import { sanitizeString } from '../../../utils/utils.js'
+import { pathJoin, basePathJoin } from '../../../utils/paths.js'
 import { FileSystem } from '../../../utils/fileSystem.js'
 import axios from 'axios'
 import cliProgress from 'cli-progress'

@@ -1,6 +1,8 @@
 import { v4 as uuidv4 } from 'uuid'
 import constants from '../../../utils/constants.js'
-import { displayText, sanitizeString, pathJoin } from '../../../utils/utils.js'
+import { displayText } from '../../../utils/display.js'
+import { sanitizeString } from '../../../utils/utils.js'
+import { pathJoin } from '../../../utils/paths.js'
 import PuppeteerPageFactory from '../../wrappers/Puppeteer.js'
 
 export default class BrowserActions {

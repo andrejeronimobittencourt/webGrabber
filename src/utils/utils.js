@@ -1,117 +1,14 @@
-import yaml from 'js-yaml'
-import Chalk from '../classes/wrappers/Chalk.js'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import constants from './constants.js'
-import { FileSystem } from './fileSystem.js'
-import { grabSchema, formatGrabValidationError } from '../schemas/grabSchema.js'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-const TABSIZE = 2
-
-export const pathJoin = (...paths) => {
-	return path.join(...paths)
-}
-
-export const basePathJoin = (...paths) => {
-	return pathJoin(__dirname, ...paths)
-}
-
-// get all grab configs from grabs folder
-export const getGrabList = async () => {
-	const grabsPath = basePathJoin('../grabs')
-	const files = await FileSystem.readdir(grabsPath)
-	const grabList = []
-
-	for (const file of files) {
-		try {
-			let doc
-			const ext = file.split('.').pop()
-			const filePath = pathJoin(grabsPath, file)
-
-			if (ext === 'yml' || ext === 'yaml') {
-				const content = await FileSystem.readFile(filePath, 'utf8')
-				doc = yaml.load(content)
-			} else if (ext === 'json') {
-				const content = await FileSystem.readFile(filePath, 'utf8')
-				doc = JSON.parse(content)
-			} else {
-				continue
-			}
-
-			const result = grabSchema.safeParse(doc)
-			if (!result.success) {
-				console.warn(Chalk.create([
-					{ text: `Warning: Invalid grab config in ${file}:\n`, color: 'yellow', style: 'bold' },
-					{ text: formatGrabValidationError(result.error), color: 'red' }
-				]))
-				continue
-			}
-
-			// Use parsed data
-			doc = result.data
-
-			if (grabList.some((g) => g.name === doc.name)) {
-				console.warn(
-					Chalk.create([
-						{
-							text: `Warning: Duplicate grab name '${doc.name}' in ${file}. Skipping.`,
-							color: 'yellow',
-							style: 'bold',
-						},
-					]),
-				)
-				continue
-			}
-
-			grabList.push(doc)
-		} catch (e) {
-			displayErrorAndExit(e)
-		}
-	}
-	return grabList
-}
-
-export const displayError = (error) => {
-	displayText([{ text: `ERROR: ${error.message}`, color: 'red', style: 'bold' }])
-}
-
-export const displayErrorAndExit = (error) => {
-	displayError(error)
-	if (process.env.NODE_ENV === 'test') {
-		throw error
-	}
-	process.exit(1)
-}
-
-export const displayText = (textData, brain) => {
-	if (!brain) Chalk.write(textData)
-	else {
-		const payloadId = brain.recall(constants.payloadIdKey)
-		if (payloadId) textData.unshift({ text: `${payloadId}: `, color: 'red', style: 'bold' })
-		Chalk.write([{ text: ' '.repeat(brain.recall(constants.indentationKey)) }, ...textData])
-	}
-}
-
-export const resetIndentation = (brain) => {
-	brain.learn(constants.indentationKey, 0)
-}
-
-export const incrementIndentation = (brain) => {
-	brain.learn(constants.indentationKey, brain.recall(constants.indentationKey) + TABSIZE)
-}
-
-export const decrementIndentation = (brain) => {
-	brain.learn(constants.indentationKey, brain.recall(constants.indentationKey) - TABSIZE)
-}
-
+/**
+ * Sanitize string by removing non-alphanumeric characters (except allowed ones)
+ */
 export const sanitizeString = (string) => {
-	// remove all non-alphanumeric characters and slashes
 	return string.replace(/[^a-zA-Z0-9-_.:?@(), +!#$%&*;|'"=<>^]/g, '').trim()
 }
 
+/**
+ * Interpolate variables in params using brain memory
+ * Replaces {{variable}} with values from brain
+ */
 export const interpolation = (params, brain) => {
 	const newParams = { ...params }
 	for (const [key, value] of Object.entries(newParams)) {
@@ -121,9 +18,11 @@ export const interpolation = (params, brain) => {
 			if (match) {
 				match.forEach((m) => {
 					const variable = m.match(/{{(.*?)}}/)[1].trim()
-					if (typeof brain.recall(variable) === 'object' || Array.isArray(brain.recall(variable)))
+					if (typeof brain.recall(variable) === 'object' || Array.isArray(brain.recall(variable))) {
 						newParams[key] = brain.recall(variable)
-					else newParams[key] = newParams[key].replace(m, brain.recall(variable))
+					} else {
+						newParams[key] = newParams[key].replace(m, brain.recall(variable))
+					}
 				})
 			}
 		} else if (Array.isArray(value)) {
@@ -138,6 +37,9 @@ export const interpolation = (params, brain) => {
 	return newParams
 }
 
+/**
+ * Parse command line arguments for mode and grab name
+ */
 export const parseModeAndGrabName = () => {
 	const args = process.argv.slice(2)
 	const helpMode = args.includes('--help')
@@ -147,6 +49,9 @@ export const parseModeAndGrabName = () => {
 	}
 }
 
+/**
+ * Generate welcome page HTML for server mode
+ */
 export const welcomePage = (port) => `
 <!DOCTYPE html>
 <html lang="en">

@@ -1,5 +1,6 @@
 import constants from '../../../utils/constants.js'
-import { displayText, sanitizeString } from '../../../utils/utils.js'
+import { displayText } from '../../../utils/display.js'
+import { sanitizeString } from '../../../utils/utils.js'
 import readline from 'readline'
 import { v4 as uuidv4 } from 'uuid'
 

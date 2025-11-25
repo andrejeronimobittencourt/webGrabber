@@ -1,4 +1,4 @@
-import { displayText } from './utils.js'
+import { displayText } from './display.js'
 
 /**
  * Retry a function with exponential backoff

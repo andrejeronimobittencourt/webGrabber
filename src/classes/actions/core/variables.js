@@ -1,5 +1,5 @@
 import constants from '../../../utils/constants.js'
-import { displayText } from '../../../utils/utils.js'
+import { displayText } from '../../../utils/display.js'
 
 export default class VariablesActions {
 	static register(actionList) {

@@ -1,4 +1,5 @@
-import { interpolation, displayText } from '../../utils/utils.js'
+import { interpolation } from '../../utils/utils.js'
+import { displayText } from '../../utils/display.js'
 import constants from '../../utils/constants.js'
 import { validateActionParams } from '../../schemas/actionSchemas.js'
 import logger from '../../utils/logger.js'

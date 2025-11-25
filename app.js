@@ -1,37 +1,68 @@
 import 'dotenv/config'
 import express from 'express'
+import { v4 as uuidv4 } from 'uuid'
 import Grabber from './src/classes/Grabber.js'
 import customize from './src/config/custom.js'
 import options from './src/config/options.js'
-import { v4 as uuidv4 } from 'uuid'
-import { displayError, displayText, welcomePage } from './src/utils/utils.js'
+import rateLimiter from './src/middleware/rateLimiter.js'
+import { displayError, displayText } from './src/utils/display.js'
+import { welcomePage } from './src/utils/utils.js'
+import logger from './src/utils/logger.js'
 
 // Function to start the server
 const startServerMode = async () => {
-	// Initialize Express app
 	const app = express()
 	app.use(express.json())
 
-	// Set the default port or use the one from environment variables
 	const port = process.env.PORT || 3000
 
-	// Define the root route with a welcome message
+	// Routes
 	app.get('/', (_, res) => res.send(welcomePage(port)))
 
-	// Define the /grab endpoint for grabbing configurations
-	app.post('/grab', async (req, res) => {
+	app.post('/grab', rateLimiter, async (req, res) => {
+		const requestId = uuidv4()
+		const startTime = Date.now()
+
 		try {
 			const payload = {
-				id: uuidv4(),
+				id: requestId,
 				body: req.body,
 			}
+
+			logger.info('Grab request received', {
+				requestId,
+				grabName: req.body?.name,
+				event: 'grab_request',
+			})
+
 			const response = await grabber.grab(payload)
+			const duration = Date.now() - startTime
+
+			logger.info('Grab request completed', {
+				requestId,
+				grabName: req.body?.name,
+				duration,
+				event: 'grab_success',
+			})
+
 			res.status(200).send(response)
 		} catch (error) {
+			const duration = Date.now() - startTime
+
+			logger.error('Grab request failed', {
+				requestId,
+				grabName: req.body?.name,
+				duration,
+				error: error.message,
+				stack: error.stack,
+				event: 'grab_error',
+			})
+
 			displayError(`Server Error: ${error.message}`)
 			res.status(500).send('Internal Server Error')
 		}
 	})
+
 	app.listen(port, () =>
 		displayText([{ text: `Server started on port ${port}`, color: 'green', style: 'bold' }]),
 	)
