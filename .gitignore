@@ -5,3 +5,5 @@ src/resources/*
 !src/grabs/.gitkeep
 !src/resources/.gitkeep
 .DS_Store
+logs/
+*.log
