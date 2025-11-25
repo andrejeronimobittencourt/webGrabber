@@ -16,10 +16,13 @@ const startServerMode = async () => {
 
 	const port = process.env.PORT || 3000
 
+	// Apply rate limiting to all routes
+	app.use(rateLimiter)
+
 	// Routes
 	app.get('/', (_, res) => res.send(welcomePage(port)))
 
-	app.post('/grab', rateLimiter, async (req, res) => {
+	app.post('/grab', async (req, res) => {
 		const requestId = uuidv4()
 		const startTime = Date.now()
 
