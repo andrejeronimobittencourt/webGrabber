@@ -4,14 +4,14 @@ import { ActionListContainer } from './actions/Actions.js'
 import CoreActionList from './actions/CoreActionList.js'
 import CustomActionList from './actions/CustomActionList.js'
 import BrainFactory from './Brain.js'
+import { getGrabList } from '../utils/grabLoader.js'
 import {
-	getGrabList,
 	displayError,
 	displayErrorAndExit,
 	displayText,
 	resetIndentation,
-	parseModeAndGrabName,
-} from '../utils/utils.js'
+} from '../utils/display.js'
+import { parseModeAndGrabName } from '../utils/utils.js'
 import constants from '../utils/constants.js'
 
 export default class Grabber {
@@ -30,7 +30,7 @@ export default class Grabber {
 		this.#customActionList.add(name, action)
 	}
 
-	async init(puppeteerOptions) {
+	async init(puppeteerOptions = {}) {
 		try {
 			// for each process.env add to memory
 			const memories = new Map()
@@ -52,7 +52,8 @@ export default class Grabber {
 
 	async loadGrabList(grabList) {
 		try {
-			getGrabList().forEach((grab) => grabList.add(grab))
+			const grabs = await getGrabList()
+			grabs.forEach((grab) => grabList.add(grab))
 			// if grabList is empty then throw error
 			if (grabList.isEmpty()) throw new Error('No grabs found nor provided')
 			displayText([{ text: 'Grab configs loaded', color: 'green', style: 'bold' }])

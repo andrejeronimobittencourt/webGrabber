@@ -1,0 +1,23 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Integration Test Page</title>
+</head>
+<body>
+    <h1 id="title">Welcome to Test Page</h1>
+    <div id="content">This is some test content.</div>
+    <input type="text" id="input-field" />
+    <button id="submit-btn" onclick="document.getElementById('result').innerText = 'Clicked!'">Submit</button>
+    <div id="result">Waiting...</div>
+    
+    <script>
+        // Add a delay to simulate network load if needed
+        setTimeout(() => {
+            const div = document.createElement('div');
+            div.id = 'delayed-content';
+            div.innerText = 'Loaded later';
+            document.body.appendChild(div);
+        }, 500);
+    </script>
+</body>
+</html>

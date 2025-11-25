@@ -61,7 +61,7 @@ Place a JSON, YML, or YAML file in `src/grabs`. The `name` becomes the grab iden
     {
       "name": "log",
       "params": {
-        "text": "Hello World!"
+        "message": "Hello World!"
       }
     }
   ]
@@ -74,7 +74,7 @@ name: hello-world
 actions:
   - name: log
     params:
-      text: "Hello World!"
+      message: "Hello World!"
 ```
 
 ### Run locally

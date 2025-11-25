@@ -1,93 +1,14 @@
-import yaml from 'js-yaml'
-import Chalk from '../classes/wrappers/Chalk.js'
-import fs from 'fs'
-import path from 'path'
-import { fileURLToPath } from 'url'
-import { dirname } from 'path'
-import constants from './constants.js'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = dirname(__filename)
-
-const TABSIZE = 2
-
-export const pathJoin = (...paths) => {
-	return path.join(...paths)
-}
-
-export const basePathJoin = (...paths) => {
-	return pathJoin(__dirname, ...paths)
-}
-
-export const fsOperation = (operation, location, ...args) => {
-	const path = pathJoin(location)
-	if (typeof fs[operation] === 'function') {
-		return fs[operation](path, ...args)
-	}
-	throw new Error(`Invalid fs operation: ${operation}`)
-}
-
-// get all grab configs from grabs folder
-export const getGrabList = () => {
-	const files = fsOperation(constants.fsMethods.readdir, basePathJoin('../grabs'), 'utf8')
-	const grabList = []
-	files.forEach((file) => {
-		try {
-			let doc
-			// if file has .yml or .yaml extension
-			if (file.split('.').pop() === 'yml' || file.split('.').pop() === 'yaml')
-				doc = yaml.load(
-					fsOperation(constants.fsMethods.readFile, basePathJoin(`../grabs/${file}`), 'utf8'),
-				)
-			// if file has .json extension
-			else if (file.split('.').pop() === 'json')
-				doc = JSON.parse(
-					fsOperation(constants.fsMethods.readFile, basePathJoin(`../grabs/${file}`), 'utf8'),
-				)
-			else return
-			grabList.push(doc)
-		} catch (e) {
-			displayErrorAndExit(e)
-		}
-	})
-	return grabList
-}
-
-export const displayError = (error) => {
-	displayText([{ text: `ERROR: ${error.message}`, color: 'red', style: 'bold' }])
-}
-
-export const displayErrorAndExit = (error) => {
-	displayError(error)
-	process.exit(1)
-}
-
-export const displayText = (textData, brain) => {
-	if (!brain) Chalk.write(textData)
-	else {
-		const payloadId = brain.recall(constants.payloadIdKey)
-		if (payloadId) textData.unshift({ text: `${payloadId}: `, color: 'red', style: 'bold' })
-		Chalk.write([{ text: ' '.repeat(brain.recall(constants.indentationKey)) }, ...textData])
-	}
-}
-
-export const resetIndentation = (brain) => {
-	brain.learn(constants.indentationKey, 0)
-}
-
-export const incrementIndentation = (brain) => {
-	brain.learn(constants.indentationKey, brain.recall(constants.indentationKey) + TABSIZE)
-}
-
-export const decrementIndentation = (brain) => {
-	brain.learn(constants.indentationKey, brain.recall(constants.indentationKey) - TABSIZE)
-}
-
+/**
+ * Sanitize string by removing non-alphanumeric characters (except allowed ones)
+ */
 export const sanitizeString = (string) => {
-	// remove all non-alphanumeric characters and slashes
 	return string.replace(/[^a-zA-Z0-9-_.:?@(), +!#$%&*;|'"=<>^]/g, '').trim()
 }
 
+/**
+ * Interpolate variables in params using brain memory
+ * Replaces {{variable}} with values from brain
+ */
 export const interpolation = (params, brain) => {
 	const newParams = { ...params }
 	for (const [key, value] of Object.entries(newParams)) {
@@ -97,9 +18,11 @@ export const interpolation = (params, brain) => {
 			if (match) {
 				match.forEach((m) => {
 					const variable = m.match(/{{(.*?)}}/)[1].trim()
-					if (typeof brain.recall(variable) === 'object' || Array.isArray(brain.recall(variable)))
+					if (typeof brain.recall(variable) === 'object' || Array.isArray(brain.recall(variable))) {
 						newParams[key] = brain.recall(variable)
-					else newParams[key] = newParams[key].replace(m, brain.recall(variable))
+					} else {
+						newParams[key] = newParams[key].replace(m, brain.recall(variable))
+					}
 				})
 			}
 		} else if (Array.isArray(value)) {
@@ -114,6 +37,9 @@ export const interpolation = (params, brain) => {
 	return newParams
 }
 
+/**
+ * Parse command line arguments for mode and grab name
+ */
 export const parseModeAndGrabName = () => {
 	const args = process.argv.slice(2)
 	const helpMode = args.includes('--help')
@@ -123,6 +49,9 @@ export const parseModeAndGrabName = () => {
 	}
 }
 
+/**
+ * Generate welcome page HTML for server mode
+ */
 export const welcomePage = (port) => `
 <!DOCTYPE html>
 <html lang="en">

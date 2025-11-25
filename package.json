@@ -1,11 +1,14 @@
 {
   "name": "@andrejcbittencourt/webgrabber",
-  "version": "4.1.12",
+  "version": "4.2.0",
   "description": "Config based web scraper & browser automation",
   "main": "app.js",
   "type": "module",
   "scripts": {
-    "test": "node --test",
+    "test": "node --test 'test/**/*.test.js'",
+    "test:unit": "node --test test/unit/**/*.test.js",
+    "test:integration": "node --test test/integration/**/*.test.js",
+    "test:watch": "node --test --watch 'test/**/*.test.js'",
     "start": "node app.js",
     "help": "node app.js --help",
     "start:server": "node app.js --server"
@@ -19,23 +22,27 @@
   "author": "André Bittencourt",
   "license": "MIT",
   "dependencies": {
+    "acorn": "^8.15.0",
     "axios": "^1.13.2",
-    "body-parser": "^2.2.0",
+    "body-parser": "^2.2.1",
     "chalk": "^5.6.2",
     "cli-progress": "^3.12.0",
     "dotenv": "^17.2.2",
     "express": "^5.1.0",
+    "express-rate-limit": "^8.2.1",
     "js-yaml": "^4.1.1",
     "lodash": "^4.17.21",
     "puppeteer": "^24.31.0",
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-adblocker": "^2.13.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "uuid": "^13.0.0"
+    "uuid": "^13.0.0",
+    "winston": "^3.18.3",
+    "zod": "^3.23.8"
   },
   "devDependencies": {
     "@types/express": "^5.0.5",
-    "@types/lodash": "^4.17.20",
+    "@types/lodash": "^4.17.21",
     "eslint": "^9.39.1",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.4",
