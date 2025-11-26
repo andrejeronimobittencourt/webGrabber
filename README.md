@@ -8,26 +8,26 @@ webGrabber is a config-based web scraper and browser automation tool powered by 
 
 ## Table of Contents
 - [webGrabber](#webgrabber)
-	- [Table of Contents](#table-of-contents)
-	- [Features](#features)
-	- [Prerequisites](#prerequisites)
-	- [Installation](#installation)
-	- [Quickstart](#quickstart)
-		- [Create a grab](#create-a-grab)
-		- [Run locally](#run-locally)
-		- [Run a specific grab](#run-a-specific-grab)
-		- [Run in server mode](#run-in-server-mode)
-	- [Grab Configuration Reference](#grab-configuration-reference)
-		- [Memory interpolation](#memory-interpolation)
-		- [Returning values between actions](#returning-values-between-actions)
-		- [Reserved variable names](#reserved-variable-names)
-	- [Actions](#actions)
-		- [Built-in actions](#built-in-actions)
-		- [Custom actions](#custom-actions)
-	- [Environment Variables](#environment-variables)
-	- [Puppeteer Options](#puppeteer-options)
-	- [Chromium and Browser Path](#chromium-and-browser-path)
-	- [License](#license)
+  - [Table of Contents](#table-of-contents)
+  - [Features](#features)
+  - [Prerequisites](#prerequisites)
+  - [Installation](#installation)
+  - [Quickstart](#quickstart)
+    - [Create a grab](#create-a-grab)
+    - [Run locally](#run-locally)
+    - [Run a specific grab](#run-a-specific-grab)
+    - [Run in server mode](#run-in-server-mode)
+  - [Grab Configuration Reference](#grab-configuration-reference)
+    - [Memory interpolation](#memory-interpolation)
+    - [Returning values between actions](#returning-values-between-actions)
+    - [Reserved variable names](#reserved-variable-names)
+  - [Actions](#actions)
+    - [Built-in actions](#built-in-actions)
+    - [Custom actions](#custom-actions)
+  - [Environment Variables](#environment-variables)
+  - [Puppeteer Options](#puppeteer-options)
+  - [Chromium and Browser Path](#chromium-and-browser-path)
+  - [License](#license)
 
 ## Features
 - **Declarative grabs:** Author scraping or automation workflows as JSON/YAML files in `src/grabs`.
@@ -107,7 +107,7 @@ Example (using `curl`):
 ```bash
 curl -X POST http://localhost:3000/grab \
   -H "Content-Type: application/json" \
-  -d '{"name":"hello-world","actions":[{"name":"log","params":{"text":"Hello World!"}}]}'
+  -d '{"name":"hello-world","actions":[{"name":"log","params":{"message":"Hello World!"}}]}'
 ```
 
 ## Grab Configuration Reference
