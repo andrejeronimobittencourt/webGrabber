@@ -241,6 +241,10 @@ function evaluateAST(node, context) {
 				? evaluateAST(node.property, context)
 				: node.property.name
 
+			if (prop && typeof prop === 'string' && BLOCKED_PROPERTIES.has(prop)) {
+				throw new Error(`Access to property '${prop}' is not allowed`)
+			}
+
 			if (obj == null) {
 				throw new Error(`Cannot access property '${prop}' of ${obj}`)
 			}
@@ -268,8 +272,19 @@ function evaluateAST(node, context) {
 			}
 			const args = node.arguments.map(arg => evaluateAST(arg, context))
 
-			// For member expressions, bind the correct 'this'
+			// For member expressions, bind the correct 'this' and enforce safety blocks
 			if (node.callee.type === 'MemberExpression') {
+				const prop = node.callee.computed
+					? evaluateAST(node.callee.property, context)
+					: node.callee.property.name
+
+				if (prop && typeof prop === 'string' && !SAFE_METHODS.has(prop) && !prop.startsWith('get')) {
+					const objNode = node.callee.object
+					if (!(objNode.type === 'Identifier' && objNode.name === 'Math')) {
+						throw new Error(`Method '${prop}' is not whitelisted`)
+					}
+				}
+
 				const thisObj = evaluateAST(node.callee.object, context)
 				return callee.apply(thisObj, args)
 			}

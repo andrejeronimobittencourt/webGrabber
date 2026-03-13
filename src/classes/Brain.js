@@ -1,3 +1,4 @@
+import isPlainObject from 'lodash/isPlainObject.js'
 import cloneDeep from 'lodash/cloneDeep.js'
 import constants from '../utils/constants.js'
 
@@ -11,7 +12,7 @@ class Brain {
 
 	learn(key, value) {
 		if (key === constants.pagesKey || key === constants.activePageKey) this.#memory.set(key, value)
-		else if (typeof value === 'object') this.#memory.set(key, cloneDeep(value))
+		else if (value !== null && (Array.isArray(value) || isPlainObject(value))) this.#memory.set(key, cloneDeep(value))
 		else this.#memory.set(key, value)
 	}
 	recall(key) {

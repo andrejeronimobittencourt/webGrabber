@@ -60,6 +60,7 @@ export default class VariablesActions {
 			const { key, value } = brain.recall(constants.paramsKey)
 			let content = brain.recall(key)
 			if (content === undefined) content = []
+			else if (!Array.isArray(content)) content = [content]
 			content.push(value)
 			displayText(
 				[

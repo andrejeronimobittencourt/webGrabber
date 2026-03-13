@@ -19,8 +19,10 @@ export default class BrowserActions {
 					brain,
 				)
 				if (func === 'newPage') {
-					brain.learn(constants.paramsKey, { pageKey: uuidv4() })
+					const pageKey = uuidv4()
+					brain.learn(constants.paramsKey, { pageKey })
 					await brain.perform('newPage')
+					brain.learn(constants.inputKey, pageKey)
 					return
 				}
 				const params = Object.values(rest)

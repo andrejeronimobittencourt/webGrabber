@@ -129,8 +129,25 @@ export default class ControlActions {
 		})
 		actionList.add('while', async (brain) => {
 			const { condition, actions } = brain.recall(constants.paramsKey)
+			
+			if (!validateExpression(condition)) {
+				throw new Error(`Invalid or potentially unsafe condition: ${condition}`)
+			}
+			
 			incrementIndentation(brain)
-			while (eval(condition)) {
+			
+			const evaluateCondition = () => {
+				const context = {
+					INPUT: brain.recall(constants.inputKey),
+				}
+				try {
+					return safeEvaluate(condition, context)
+				} catch (error) {
+					throw new Error(`Failed to evaluate condition "${condition}": ${error.message}`)
+				}
+			}
+
+			while (evaluateCondition()) {
 				for (let action of actions) {
 					brain.learn(constants.paramsKey, action.params)
 					await brain.perform(action.name, brain.recall(constants.activePageKey))
