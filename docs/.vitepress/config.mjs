@@ -3,6 +3,7 @@ import { defineConfig } from 'vitepress'
 export default defineConfig({
   title: "<webGrabber/>",
   description: "Config based web scraper & browser automation",
+  base: "/webGrabber/",
   themeConfig: {
     logo: '/logo.svg', // Will be added later if needed, users logo description here
     nav: [
