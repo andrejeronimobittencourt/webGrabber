@@ -1,4 +1,4 @@
-.env
+.env*
 node_modules
 src/grabs/*
 src/resources/*
@@ -7,3 +7,5 @@ src/resources/*
 .DS_Store
 logs/
 *.log
+docs/.vitepress/cache
+docs/.vitepress/dist

@@ -1,0 +1,34 @@
+:root {
+    /* Metallic Black Theme for webGrabber */
+    --vp-c-brand-1: #1a1a1a;
+    --vp-c-brand-2: #333333;
+    --vp-c-brand-3: #595959;
+    --vp-c-brand-soft: rgba(26, 26, 26, 0.1);
+
+    /* Backgrounds & Text */
+    --vp-c-bg: #ffffff;
+    --vp-c-bg-alt: #f6f6f7;
+    --vp-c-text-1: #1a1a1a;
+    --vp-c-text-2: #3a3a3a;
+
+    /* Buttons */
+    --vp-button-brand-bg: #1a1a1a;
+    --vp-button-brand-hover-bg: #333333;
+    --vp-button-brand-active-bg: #404040;
+}
+
+/* Dark mode overrides (to stick with the black/white metallic theme) */
+.dark {
+    --vp-c-bg: #0d0d0d;
+    --vp-c-bg-alt: #1a1a1a;
+    --vp-c-text-1: #ffffff;
+    --vp-c-text-2: #cccccc;
+
+    --vp-c-brand-1: #d9d9d9;
+    --vp-c-brand-2: #ffffff;
+    --vp-c-brand-3: #f0f0f0;
+
+    --vp-button-brand-bg: #333333;
+    --vp-button-brand-hover-bg: #595959;
+    --vp-button-brand-text: #ffffff;
+}

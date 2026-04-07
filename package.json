@@ -1,6 +1,6 @@
 {
-  "name": "@andrejcbittencourt/webgrabber",
-  "version": "4.2.0",
+  "name": "@andrejeronimobittencourt/webgrabber",
+  "version": "4.2.1",
   "description": "Config based web scraper & browser automation",
   "main": "app.js",
   "type": "module",
@@ -11,7 +11,10 @@
     "test:watch": "node --test --watch 'test/**/*.test.js'",
     "start": "node app.js",
     "help": "node app.js --help",
-    "start:server": "node app.js --server"
+    "start:server": "node app.js --server",
+    "docs:dev": "vitepress dev docs",
+    "docs:build": "vitepress build docs",
+    "docs:preview": "vitepress preview docs"
   },
   "keywords": [
     "javascript",
@@ -45,6 +48,7 @@
     "eslint": "^9.39.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",
-    "prettier": "^3.8.1"
+    "prettier": "^3.8.1",
+    "vitepress": "^1.0.0-rc.44"
   }
 }
