@@ -38,7 +38,7 @@
     "puppeteer-extra": "^3.3.6",
     "puppeteer-extra-plugin-adblocker": "^2.13.6",
     "puppeteer-extra-plugin-stealth": "^2.11.2",
-    "uuid": "^13.0.0",
+    "uuid": "^14.0.0",
     "winston": "^3.19.0",
     "zod": "^3.25.76"
   },
