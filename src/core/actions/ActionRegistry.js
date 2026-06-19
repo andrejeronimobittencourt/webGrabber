@@ -1,6 +1,5 @@
-import { interpolation } from '../../utils/utils.js'
-import { displayText } from '../../utils/display.js'
-import constants from '../../utils/constants.js'
+import { interpolation } from '../../utils/interpolation.js'
+import { present } from '../../infrastructure/presenter/present.js'
 import { validateActionParams } from '../../schemas/actionSchemas.js'
 import logger from '../../utils/logger.js'
 
@@ -24,9 +23,8 @@ export class ActionList {
 	}
 
 	add(name, action) {
-		if (!this.#list.has(name)) {
-			this.#list.set(name, new Action(action))
-		}
+		if (this.#list.has(name)) throw new Error(`Action ${name} already exists`)
+		this.#list.set(name, new Action(action))
 	}
 
 	has(name) {
@@ -38,7 +36,7 @@ export class ActionList {
 
 		logger.debug(`Starting action: ${name}`)
 
-		displayText(
+		present(
 			[
 				{ text: 'Running action : ', color: 'blue', style: 'bold' },
 				{ text: name, color: 'whiteBright' },
@@ -46,8 +44,8 @@ export class ActionList {
 			brain,
 		)
 
-		if (brain.recall(constants.paramsKey)) {
-			let params = brain.recall(constants.paramsKey)
+		if (brain.run.params) {
+			let params = brain.run.params
 
 			// First interpolate variables
 			params = interpolation(params, brain)
@@ -63,7 +61,7 @@ export class ActionList {
 				throw validationError
 			}
 
-			brain.learn(constants.paramsKey, params)
+			brain.run.params = params
 		}
 
 		try {

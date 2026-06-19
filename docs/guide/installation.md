@@ -31,10 +31,10 @@ If `npm start` throws errors complaining about "cannot find Chromium" or "Execut
 npx puppeteer browsers install chrome
 ```
 
-Alternatively, you can skip the automated browser download entirely by relying on your local Google Chrome installation. To do this, configure the `executablePath` in `src/config/options.js`:
+Alternatively, you can skip the automated browser download entirely by relying on your local Google Chrome installation. To do this, configure the `executablePath` in `src/config/puppeteerOptions.js`:
 
 ```javascript
-// src/config/options.js
+// src/config/puppeteerOptions.js
 export default {
   executablePath: '/Applications/Google Chrome.app/Contents/MacOS/Google Chrome', // Path for macOS
   // executablePath: '/usr/bin/google-chrome-stable' // Path for Linux

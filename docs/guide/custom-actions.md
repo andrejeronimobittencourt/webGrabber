@@ -1,15 +1,15 @@
 # Building Custom Actions
 
-While **webGrabber** bundles a dense array of [Built-in Actions](./actions.md) capable of achieving most heavy lifting, specialized pipelines often require tailored logic. webGrabber handles extensibility organically inside `src/config/custom.js`.
+While **webGrabber** bundles a dense array of [Built-in Actions](./actions.md) capable of achieving most heavy lifting, specialized pipelines often require tailored logic. webGrabber handles extensibility organically inside `src/config/customActions.js`.
 
-## The `custom.js` Engine Hook
+## The `customActions.js` Engine Hook
 
 The custom configurations module exports a function intercepting the underlying `Grabber` instance prior to browser initialization. Here, we can exploit the `addCustomAction` prototype.
 
 **Basic Setup:**
 
 ```javascript
-// src/config/custom.js
+// src/config/customActions.js
 export default (grabber) => {
 	
   grabber.addCustomAction('complexMath', async (brain, page) => {
@@ -41,10 +41,12 @@ Once an action is booted into the engine registry namespace, any JSON/YAML confi
 When your async callback block is invoked, the engine feeds your action two dense orchestrator objects:
 
 ### 1. `brain` (State Management Object)
-The `brain` object is an expansive proxy mapping memory states. You retrieve environment outputs or step variables strictly via `brain.recall('KEY')` and inject them using `brain.learn('KEY', value)`.
-- **`brain.recall('PARAMS')`**: Access params parsed strictly from your grab file. Use this to read config flags.
-- **`brain.recall('INPUT')` / `brain.learn('INPUT', ...)`**: Fetch or mutate the pipe value outputted by the immediately preceding action.
-- **`brain.recall('PAGES')` / `brain.recall('ACTIVE_PAGE')`**: Retrieve the internal dictionary handling all open Puppeteer tabs, or target the currently focused frame natively.
+The `brain` object exposes script memory and namespaced runtime state:
+- **`brain.learn(key, value)` / `brain.recall(key)`**: Script variables and the `INPUT` pipe. Env vars prefixed with `GRABBER_` are synced into script memory at startup.
+- **`brain.recall('INPUT')` / `brain.learn('INPUT', ...)`**: Fetch or mutate the pipe value from the immediately preceding action.
+- **`brain.run.params`**: Params for the current action (from the grab file).
+- **`brain.browser.pages` / `brain.browser.activePage`**: Open Puppeteer tabs and the focused page.
+- **`brain.fs.baseDir` / `brain.fs.currentDir`**: Output root (`output/<grab-name>/`) and the active working subdirectory.
 
 ### 2. `page` (Puppeteer Frame Object)
 Passes the active [Puppeteer Page](https://pptr.dev/api/puppeteer.page) reference pointing at the target window viewport context. Utilize native Puppeteer commands.
@@ -56,11 +58,10 @@ export default (grabber) => {
 
   grabber.addCustomAction('extractAllDynamicPrices', async (brain, page) => {
     
-    // 1. Read strict parameter metadata seamlessly
-    const { selectorKey } = brain.recall('PARAMS');
-    const cssTarget = selectorKey || ".price";
+    const { selectorKey } = brain.run.params
+    const cssTarget = selectorKey || '.price'
 
-    // 2. Perform native Puppeteer actions bypassing action wrappers
+    // 2. Perform native Puppeteer actions
     await page.waitForSelector(cssTarget, { timeout: 5000 });
     
     // 3. Extract custom data via Page evaluate
@@ -70,7 +71,7 @@ export default (grabber) => {
     }, cssTarget);
 
     // 4. Overwrite global brain pipe state using .learn() for the next action to intercept
-    brain.learn('INPUT', mappedPrices.join(",")); 
+    brain.learn('INPUT', mappedPrices.join(','))
   })
 
 }

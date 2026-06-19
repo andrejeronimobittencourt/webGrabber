@@ -4,7 +4,7 @@ Grabs are the heart of **webGrabber**. A grab is a purely declarative definition
 
 ## The Basic Structure
 
-A grab file should be stored inside the `src/grabs/` directory. Each file understands three core root properties:
+A grab file should be stored inside the `grabs/` directory. Each file understands three core root properties:
 - `name` *(string)*: A unique identifier for the payload (required).
 - `description` *(string)*: An optional human-readable summary of what the flow achieves.
 - `actions` *(array)*: A sequential array of automation steps to execute (required).
@@ -35,6 +35,18 @@ A grab file should be stored inside the `src/grabs/` directory. Each file unders
 ```
 
 *Note: The `await` Boolean flag exists on all actions and defaults to `true`. Setting it to `false` allows execution of the next step immediately without waiting for the current step's Promise to resolve.*
+
+## Grab Output Directory
+
+When a grab runs, the engine automatically calls `setBaseDir` using the grab's `name`. All filesystem actions resolve relative to:
+
+```
+output/<grab-name>/
+```
+
+For example, a grab named `example-test` writes files under `output/example-test/`. This folder is created at runtime and is gitignored — only `output/.gitkeep` is tracked in the repository.
+
+Place your grab configs in `grabs/` at the project root; generated artifacts land in `output/`, keeping source and run results separate.
 
 ### Context Passing & Memory Interpolation
 
@@ -76,11 +88,12 @@ Some actions (like `getElements` or `matchFromSelector`) return a value at the e
 }
 ```
 
-## Reserved Keywords
+## Script Memory & `INPUT`
 
-It's highly recommended you abstain from mutating the following memory keywords:
-- `INPUT`: Pipe variable, overridden every step.
-- `PARAMS`: Run metadata and payloads.
-- `PAYLOAD_ID`: Unique runtime ID.
-- `CURRENT_DIR` & `BASE_DIR`: Flow filesystem awareness.
-- `PAGES` & `ACTIVE_PAGE`: Browser tab management flags.
+Grab scripts store user-defined variables via `setVariable`, `getVariable`, and related actions. These live in script memory and are accessed with `brain.learn()` / `brain.recall()` in custom actions, or via <code v-pre>{{variableName}}</code> interpolation in grab configs.
+
+- **`INPUT`**: The pipe variable. Actions that produce a result (e.g. `getElements`, `readFromText`) write their output here. It is overwritten each step — chain it immediately in the next action if you need the value.
+
+Engine runtime state (browser tabs, filesystem paths, verbose level, action params) is **not** stored in script memory. It lives on namespaced brain properties (`brain.browser`, `brain.fs`, `brain.presenter`, `brain.run`) and is managed internally by the engine.
+
+Avoid using `INPUT` as a long-lived variable name in `setVariable` — reserve it for step-to-step piping.

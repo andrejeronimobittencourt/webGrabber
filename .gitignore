@@ -1,9 +1,9 @@
 .env*
 node_modules
-src/grabs/*
-src/resources/*
-!src/grabs/.gitkeep
-!src/resources/.gitkeep
+grabs/*
+output/*
+!grabs/.gitkeep
+!output/.gitkeep
 .DS_Store
 logs/
 *.log

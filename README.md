@@ -25,7 +25,7 @@ npm install
 ```
 
 ### 2. Define a Grab Config
-Create a new file under `src/grabs/hello.json`:
+Create a new file under `grabs/hello.json`:
 ```json
 {
   "name": "hello-world",
@@ -44,7 +44,7 @@ npm run start hello-world
 For advanced HTTP trigger modes (`npm run start:server`) or dynamic memory mapping (`{{variable}}`), read the full reference inside `./docs/`.
 
 ## Contributing & Extensibility
-Extensibility sits at the absolute core of webGrabber. If you require advanced edge-case parsing or integrations beyond the generic library, see how simple it is to inject vanilla JS logic blocks using the [`src/config/custom.js`](./docs/guide/custom-actions.md) hooks engine.
+Extensibility sits at the absolute core of webGrabber. If you require advanced edge-case parsing or integrations beyond the generic library, see how simple it is to inject vanilla JS logic blocks using the [`src/config/customActions.js`](./docs/guide/custom-actions.md) hooks engine.
 
 Please refer to the [CODE_OF_CONDUCT](./CODE_OF_CONDUCT.md) prior to submitting issues or pull request patches.
 

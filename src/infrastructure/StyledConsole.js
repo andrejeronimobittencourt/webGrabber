@@ -1,9 +1,8 @@
 import chalk from 'chalk'
 
-export default class Chalk {
+export default class StyledConsole {
 	static create(templateArray) {
 		let chalkText = ''
-		// reverse the array so that the last element is the first to be styled
 		templateArray.reverse()
 		templateArray.forEach((template) => {
 			const { text, color, background, style } = template
@@ -22,6 +21,6 @@ export default class Chalk {
 	}
 
 	static write(templateArray) {
-		console.log(Chalk.create(templateArray))
+		console.log(StyledConsole.create(templateArray))
 	}
 }

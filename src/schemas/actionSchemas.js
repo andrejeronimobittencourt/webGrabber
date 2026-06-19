@@ -4,7 +4,7 @@ import * as interaction from './actions/interaction.js'
 import * as browser from './actions/browser.js'
 import * as filesystem from './actions/filesystem.js'
 import * as control from './actions/control.js'
-import * as utils from './actions/utils.js'
+import * as misc from './actions/misc.js'
 
 export const actionSchemas = {
 	// Variables & Counters
@@ -55,17 +55,21 @@ export const actionSchemas = {
 	forEach: control.forEach,
 	while: control.while_,
 	// Utilities
-	sanitizeString: utils.sanitizeString,
-	replaceString: utils.replaceString,
-	matchFromString: utils.matchFromString,
-	matchFromSelector: utils.matchFromSelector,
-	sleep: utils.sleep,
-	log: utils.log,
-	random: utils.random,
-	uuid: utils.uuid,
-	getExtension: utils.getExtension,
-	userInput: utils.userInput,
+	sanitizeString: misc.sanitizeString,
+	replaceString: misc.replaceString,
+	matchFromString: misc.matchFromString,
+	matchFromSelector: misc.matchFromSelector,
+	sleep: misc.sleep,
+	log: misc.log,
+	random: misc.random,
+	uuid: misc.uuid,
+	getExtension: misc.getExtension,
+	userInput: misc.userInput,
 }
+
+import { registerActionSchemas } from './refineAction.js'
+
+registerActionSchemas(actionSchemas)
 
 export const validateActionParams = (actionName, params) => {
 	const schema = actionSchemas[actionName]

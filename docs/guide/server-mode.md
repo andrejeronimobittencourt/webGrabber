@@ -4,7 +4,7 @@
 
 ## Command Line Standard (Local Mode)
 
-If you have grab payload configs nested correctly directly under `src/grabs/`, executing a run is straightforward. 
+If you have grab payload configs nested correctly directly under `grabs/`, executing a run is straightforward. 
 
 ```bash
 # Execute *all* JSON/YAML configs sequentially

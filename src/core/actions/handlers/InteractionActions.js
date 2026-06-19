@@ -1,7 +1,7 @@
 import constants from '../../../utils/constants.js'
-import { displayText, incrementIndentation, decrementIndentation } from '../../../utils/display.js'
+import { decrementIndentation, incrementIndentation, present } from '../../../infrastructure/presenter/present.js'
 import { pathJoin } from '../../../utils/paths.js'
-import { FileSystem } from '../../../utils/fileSystem.js'
+import { FileSystem } from '../../../utils/FileSystem.js'
 import { SelectorError, NetworkError } from '../../../errors/ActionErrors.js'
 import { retryWithBackoff, isRetryableError } from '../../../utils/retry.js'
 
@@ -10,7 +10,7 @@ const WAITUNTIL = 'networkidle0'
 export default class InteractionActions {
 	static register(actionList) {
 		actionList.add('click', async (brain, page) => {
-			const { selector, attribute, text } = brain.recall(constants.paramsKey)
+			const { selector, attribute, text } = brain.run.params
 
 			const performClick = async () => {
 				try {
@@ -62,7 +62,6 @@ export default class InteractionActions {
 				}
 			}
 
-			// Retry with backoff for retryable errors
 			await retryWithBackoff(performClick, {
 				maxAttempts: 3,
 				initialDelay: 1000,
@@ -71,7 +70,7 @@ export default class InteractionActions {
 			})
 		})
 		actionList.add('clickAll', async (brain, page) => {
-			const { selector } = brain.recall(constants.paramsKey)
+			const { selector } = brain.run.params
 			const elements = await page.$$(selector)
 			for (let i = 0; i < elements.length; i++) {
 				const element = elements[i]
@@ -93,29 +92,23 @@ export default class InteractionActions {
 			}
 		})
 		actionList.add('scrollWaitClick', async (brain, page) => {
-			const { selector, ms = 2000 } = brain.recall(constants.paramsKey)
-			// scroll to element
+			const { selector, ms = 2000 } = brain.run.params
 			await page.evaluate((selector) => {
 				const element = document.querySelector(selector)
 				element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
 			}, selector)
-			// wait for 2 seconds
 			await page.waitForTimeout(ms)
-			// Find the button and click it
 			await page.click(selector)
 		})
 		actionList.add('type', async (brain, page) => {
-			const { selector, text, secret = false } = brain.recall(constants.paramsKey)
+			const { selector, text, secret = false } = brain.run.params
 
 			const performType = async () => {
 				try {
-					displayText(
-						[
-							{ text: ': Typing ', color: 'white', style: 'italic' },
-							{ text: secret ? '•••••' : text, color: 'gray', style: 'italic' },
-						],
-						brain,
-					)
+					present([
+						{ text: ': Typing ', color: 'white', style: 'italic' },
+						{ text: secret ? '•••••' : text, color: 'gray', style: 'italic' },
+					], brain)
 					await page.waitForSelector(selector, { visible: true, timeout: 5000 })
 					await page.type(selector, text)
 				} catch (error) {
@@ -142,13 +135,13 @@ export default class InteractionActions {
 				password,
 				submitSelector,
 				cookieName,
-			} = brain.recall(constants.paramsKey)
+			} = brain.run.params
 
 			const performLogin = async () => {
 				incrementIndentation(brain)
-				const cookiesDir = pathJoin(brain.recall(constants.baseDirKey), 'cookies')
+				const cookiesDir = pathJoin(brain.fs.baseDir, 'cookies')
 				if (FileSystem.exists(`${cookiesDir}/cookies.json`)) {
-					displayText([{ text: ': Loading cookies', style: 'italic' }], brain)
+					present([{ text: ': Loading cookies', style: 'italic' }], brain)
 					const cookies = JSON.parse(
 						await FileSystem.readFile(`${cookiesDir}/cookies.json`, 'utf8'),
 					)
@@ -157,42 +150,42 @@ export default class InteractionActions {
 						: cookies[0]
 					if (accessToken && new Date(accessToken.expires * 1000) > new Date()) {
 						await page.setCookie(...cookies)
-						displayText([{ text: ': Cookies loaded', style: 'italic' }], brain)
+						present([{ text: ': Cookies loaded', style: 'italic' }], brain)
 						decrementIndentation(brain)
 						return
 					} else {
 						await FileSystem.unlink(`${cookiesDir}/cookies.json`)
-						displayText([{ text: ': Cookies expired', style: 'italic' }], brain)
+						present([{ text: ': Cookies expired', style: 'italic' }], brain)
 					}
 				}
 
 				try {
-					brain.learn(constants.paramsKey, {
+					brain.run.params = {
 						url: url,
 						func: 'goto',
 						options: { waitUntil: WAITUNTIL },
-					})
+					}
 					await brain.perform('puppeteer', page)
-					displayText([{ text: ': Page loaded', style: 'italic' }], brain)
+					present([{ text: ': Page loaded', style: 'italic' }], brain)
 
 					await page.waitForSelector(usernameSelector, { visible: true, timeout: 10000 })
-					brain.learn(constants.paramsKey, { selector: usernameSelector, text: username })
+					brain.run.params = { selector: usernameSelector, text: username }
 					await brain.perform('type', page)
 
 					await page.waitForSelector(passwordSelector, { visible: true, timeout: 5000 })
-					brain.learn(constants.paramsKey, {
+					brain.run.params = {
 						selector: passwordSelector,
 						text: password,
 						secret: true,
-					})
+					}
 					await brain.perform('type', page)
 
-					displayText([{ text: ': Credentials entered', style: 'italic' }], brain)
+					present([{ text: ': Credentials entered', style: 'italic' }], brain)
 					await page.waitForSelector(submitSelector, { visible: true, timeout: 5000 })
-					brain.learn(constants.paramsKey, { selector: submitSelector })
+					brain.run.params = { selector: submitSelector }
 					await brain.perform('click', page)
 
-					displayText([{ text: ': Login submitted', style: 'italic' }], brain)
+					present([{ text: ': Login submitted', style: 'italic' }], brain)
 					await page.waitForNavigation({
 						waitUntil: WAITUNTIL,
 						timeout: 30000,
@@ -201,14 +194,14 @@ export default class InteractionActions {
 					const cookies = await page.cookies()
 					if (cookies.length > 0) {
 						if (!FileSystem.exists(cookiesDir)) {
-							brain.learn(constants.paramsKey, { dir: 'cookies', useBaseDir: true })
+							brain.run.params = { dir: 'cookies', useBaseDir: true }
 							await brain.perform('createDir', page)
 						}
 						await FileSystem.writeFile(
 							`${cookiesDir}/cookies.json`,
 							JSON.stringify(cookies),
 						)
-						displayText([{ text: ': Cookies saved', style: 'italic' }], brain)
+						present([{ text: ': Cookies saved', style: 'italic' }], brain)
 					}
 					decrementIndentation(brain)
 				} catch (error) {

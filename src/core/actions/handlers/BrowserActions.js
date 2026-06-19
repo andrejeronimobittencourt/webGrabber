@@ -1,26 +1,25 @@
 import { v4 as uuidv4 } from 'uuid'
+import { present } from '../../../infrastructure/presenter/present.js'
 import constants from '../../../utils/constants.js'
-import { displayText } from '../../../utils/display.js'
-import { sanitizeString } from '../../../utils/utils.js'
+import { sanitizeString } from '../../../utils/stringUtils.js'
 import { pathJoin } from '../../../utils/paths.js'
-import PuppeteerPageFactory from '../../wrappers/Puppeteer.js'
+import { SelectorError } from '../../../errors/ActionErrors.js'
+import PuppeteerPageFactory from '../../../infrastructure/PuppeteerPageFactory.js'
 
 export default class BrowserActions {
 	static register(actionList) {
 		actionList.add('puppeteer', async (brain, page) => {
+			const { func, func2, ...rest } = brain.run.params
+			present([
+				{ text: ': Puppeteer ', color: 'white', style: 'italic' },
+				{ text: func, color: 'gray', style: 'italic' },
+				{ text: func2 ? '.' + func2 : '', color: 'gray', style: 'italic' },
+			], brain)
+
 			try {
-				const { func, func2, ...rest } = brain.recall(constants.paramsKey)
-				displayText(
-					[
-						{ text: ': Puppeteer ', color: 'white', style: 'italic' },
-						{ text: func, color: 'gray', style: 'italic' },
-						{ text: func2 ? '.' + func2 : '', color: 'gray', style: 'italic' },
-					],
-					brain,
-				)
 				if (func === 'newPage') {
 					const pageKey = uuidv4()
-					brain.learn(constants.paramsKey, { pageKey })
+					brain.run.params = { pageKey }
 					await brain.perform('newPage')
 					brain.learn(constants.inputKey, pageKey)
 					return
@@ -30,74 +29,68 @@ export default class BrowserActions {
 					constants.inputKey,
 					func2 ? await page[func][func2](...params) : await page[func](...params),
 				)
-			} catch (_error) {
-				// ignore
+			} catch (error) {
+				const label = `Puppeteer ${func}${func2 ? `.${func2}` : ''}`
+				throw new Error(`${label} failed: ${error.message}`)
 			}
 		})
 		actionList.add('newPage', async (brain) => {
-			const { pageKey } = brain.recall(constants.paramsKey)
+			const { pageKey } = brain.run.params
 			if (!pageKey) {
 				throw new Error("The 'newPage' action requires a 'pageKey' parameter.")
 			}
-			const pages = brain.recall(constants.pagesKey)
+			const pages = brain.browser.pages
 			const newPage = await PuppeteerPageFactory.create()
 			pages[pageKey] = newPage
-			brain.learn(constants.pagesKey, pages)
-			displayText(
-				[{ text: `New page created with key '${pageKey}'`, color: 'blue', style: 'bold' }],
-				brain,
-			)
+			brain.browser.pages = pages
+			present([
+				{ text: `New page created with key '${pageKey}'`, color: 'blue', style: 'bold' },
+			], brain)
 		})
 		actionList.add('closePage', async (brain) => {
-			const { pageKey } = brain.recall(constants.paramsKey)
+			const { pageKey } = brain.run.params
 			if (!pageKey) {
 				throw new Error("The 'closePage' action requires a 'pageKey' parameter.")
 			}
-			const pages = brain.recall(constants.pagesKey)
+			const pages = brain.browser.pages
 			const page = pages[pageKey]
 			if (page) {
 				await page.close()
 				delete pages[pageKey]
-				brain.learn(constants.pagesKey, pages)
-				displayText(
-					[{ text: `Page with key '${pageKey}' closed`, color: 'blue', style: 'bold' }],
-					brain,
-				)
+				brain.browser.pages = pages
+				present([
+					{ text: `Page with key '${pageKey}' closed`, color: 'blue', style: 'bold' },
+				], brain)
 			} else {
-				displayText(
-					[{ text: `Page with key '${pageKey}' not found`, color: 'red', style: 'bold' }],
-					brain,
-				)
+				present([
+					{ text: `Page with key '${pageKey}' not found`, color: 'red', style: 'bold' },
+				], brain)
 			}
 		})
 		actionList.add('switchPage', async (brain) => {
-			const { pageKey } = brain.recall(constants.paramsKey)
+			const { pageKey } = brain.run.params
 			if (!pageKey) {
 				throw new Error("The 'switchPage' action requires a 'pageKey' parameter.")
 			}
-			const pages = brain.recall(constants.pagesKey)
+			const pages = brain.browser.pages
 			const page = pages[pageKey]
 			if (page) {
 				await page.bringToFront()
-				brain.learn(constants.activePageKey, page)
-				displayText(
-					[{ text: `Switched to page with key '${pageKey}'`, color: 'blue', style: 'bold' }],
-					brain,
-				)
+				brain.browser.activePage = page
+				present([
+					{ text: `Switched to page with key '${pageKey}'`, color: 'blue', style: 'bold' },
+				], brain)
 			}
 		})
 		actionList.add('screenshot', async (brain, page) => {
-			const { name, type, fullPage } = brain.recall(constants.paramsKey)
+			const { name, type, fullPage } = brain.run.params
 			const validatedType = ['jpeg', 'png'].includes(type) ? type : 'png'
 			const filename = `${sanitizeString(name)}.${validatedType}`
-			const filePath = pathJoin(brain.recall(constants.currentDirKey), filename)
-			displayText(
-				[
-					{ text: ': Taking screenshot ', color: 'white', style: 'italic' },
-					{ text: name, color: 'gray', style: 'italic' },
-				],
-				brain,
-			)
+			const filePath = pathJoin(brain.fs.currentDir, filename)
+			present([
+				{ text: ': Taking screenshot ', color: 'white', style: 'italic' },
+				{ text: name, color: 'gray', style: 'italic' },
+			], brain)
 			await page.screenshot({
 				path: filePath,
 				type: validatedType,
@@ -105,18 +98,19 @@ export default class BrowserActions {
 			})
 		})
 		actionList.add('screenshotElement', async (brain, page) => {
-			const { name, type, selector } = brain.recall(constants.paramsKey)
+			const { name, type, selector } = brain.run.params
 			const validatedType = ['jpeg', 'png'].includes(type) ? type : 'png'
 			const filename = `${sanitizeString(name)}.${validatedType}`
-			const filePath = pathJoin(brain.recall(constants.currentDirKey), filename)
-			displayText(
-				[
-					{ text: ': Taking screenshot of element ', color: 'white', style: 'italic' },
-					{ text: name, color: 'gray', style: 'italic' },
-				],
-				brain,
-			)
+			const filePath = pathJoin(brain.fs.currentDir, filename)
+			present([
+				{ text: ': Taking screenshot of element ', color: 'white', style: 'italic' },
+				{ text: name, color: 'gray', style: 'italic' },
+			], brain)
 			const elementHandle = await page.$(selector)
+
+			if (!elementHandle) {
+				throw new SelectorError('screenshotElement', selector)
+			}
 
 			const boxModel = await elementHandle.boxModel()
 			const paddingLeft = boxModel.border[3].x - boxModel.margin[3].x
@@ -136,7 +130,7 @@ export default class BrowserActions {
 			})
 		})
 		actionList.add('getElements', async (brain, page) => {
-			const { selector, attribute } = brain.recall(constants.paramsKey)
+			const { selector, attribute } = brain.run.params
 			let content = []
 			const elements = await page.$$(selector)
 			for (let i = 0; i < elements.length; i++) {
@@ -154,7 +148,7 @@ export default class BrowserActions {
 			brain.learn(constants.inputKey, content)
 		})
 		actionList.add('getChildren', async (brain, page) => {
-			const { selectorParent, selectorChild, attribute } = brain.recall(constants.paramsKey)
+			const { selectorParent, selectorChild, attribute } = brain.run.params
 			const parents = await page.$$(selectorParent)
 			const result = []
 			for (const parent of parents) {
@@ -178,7 +172,7 @@ export default class BrowserActions {
 			brain.learn(constants.inputKey, result)
 		})
 		actionList.add('elementExists', async (brain, page) => {
-			const { selector } = brain.recall(constants.paramsKey)
+			const { selector } = brain.run.params
 			const element = await page.$(selector)
 			brain.learn(constants.inputKey, element ? true : false)
 		})

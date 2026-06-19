@@ -1,25 +1,28 @@
 import 'dotenv/config'
 import express from 'express'
 import { v4 as uuidv4 } from 'uuid'
-import Grabber from './src/classes/Grabber.js'
-import customize from './src/config/custom.js'
-import options from './src/config/options.js'
+import Grabber from './src/core/grabber/Grabber.js'
+import CliPresenter from './src/infrastructure/presenter/CliPresenter.js'
+import LoggerPresenter from './src/infrastructure/presenter/LoggerPresenter.js'
+import { present, presentError, setPresenter, setServerMode } from './src/infrastructure/presenter/present.js'
+import customize from './src/config/customActions.js'
+import puppeteerOptions from './src/config/puppeteerOptions.js'
 import rateLimiter from './src/middleware/rateLimiter.js'
-import { displayError, displayText } from './src/utils/display.js'
-import { welcomePage } from './src/utils/utils.js'
+import { welcomePage } from './src/utils/welcomePage.js'
 import logger from './src/utils/logger.js'
 
-// Function to start the server
+const isServerMode = process.argv.includes('--server')
+setServerMode(isServerMode)
+setPresenter(isServerMode ? new LoggerPresenter() : new CliPresenter())
+
 const startServerMode = async () => {
 	const app = express()
 	app.use(express.json())
 
 	const port = process.env.PORT || 3000
 
-	// Apply rate limiting to all routes
 	app.use(rateLimiter)
 
-	// Routes
 	app.get('/', (_, res) => res.send(welcomePage(port)))
 
 	app.post('/grab', async (req, res) => {
@@ -61,19 +64,33 @@ const startServerMode = async () => {
 				event: 'grab_error',
 			})
 
-			displayError(`Server Error: ${error.message}`)
+			presentError(error)
 			res.status(500).send('Internal Server Error')
 		}
 	})
 
 	app.listen(port, () =>
-		displayText([{ text: `Server started on port ${port}`, color: 'green', style: 'bold' }]),
+		present([{ text: `Server started on port ${port}`, color: 'green', style: 'bold' }]),
 	)
 }
 
 const grabber = new Grabber()
 customize(grabber)
-await grabber.init(options)
 
-if (process.argv.includes('--server')) await startServerMode()
-else await grabber.grab()
+try {
+	await grabber.init(puppeteerOptions)
+} catch (error) {
+	presentError(error)
+	process.exit(1)
+}
+
+if (isServerMode) {
+	await startServerMode()
+} else {
+	try {
+		await grabber.grab()
+	} catch (error) {
+		presentError(error)
+		process.exit(1)
+	}
+}

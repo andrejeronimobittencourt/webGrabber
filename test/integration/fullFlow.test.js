@@ -1,55 +1,51 @@
 import test from 'node:test'
 import assert from 'node:assert'
 import { startServer } from '../server/index.js'
-import Grabber from '../../src/classes/Grabber.js'
-import PuppeteerPageFactory from '../../src/classes/wrappers/Puppeteer.js'
-import { FileSystem } from '../../src/utils/fileSystem.js'
+import LoggerPresenter from '../../src/infrastructure/presenter/LoggerPresenter.js'
+import { setPresenter } from '../../src/infrastructure/presenter/present.js'
+import Grabber from '../../src/core/grabber/Grabber.js'
+import PuppeteerPageFactory from '../../src/infrastructure/PuppeteerPageFactory.js'
+import { FileSystem } from '../../src/utils/FileSystem.js'
+import { removeOutputDirs } from '../helpers/cleanupOutput.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 const projectRoot = path.join(__dirname, '../../')
+const outputDirs = ['integration-test', 'integration_test']
 
 test('Full Integration Flow', async (_t) => {
-	// Start Server
 	const server = await startServer()
 
 	try {
-		// Initialize Grabber
 		const grabber = new Grabber()
+		setPresenter(new LoggerPresenter())
 		await grabber.init({ headless: true })
 
-		// Load test grab directly from fixtures
 		const testGrabPath = path.join(__dirname, '../fixtures/grabs/integration-test.json')
 		const testGrabContent = await FileSystem.readFile(testGrabPath, 'utf8')
 		const testGrab = JSON.parse(testGrabContent)
 
-		// Run Grab as payload (server mode simulation)
 		await grabber.grab({ body: testGrab, id: 'test-run' })
 
-		// Verify Results
-		const resultPath = path.join(
-			projectRoot,
-			'src/resources/integration-test/result.txt',
-		)
-		const exists = FileSystem.exists(resultPath)
-		assert.ok(exists, 'Result file should exist')
+		const resultPath = path.join(projectRoot, 'output/integration-test/result.txt')
+		const altResultPath = path.join(projectRoot, 'output/integration_test/result.txt')
+		const resolvedResultPath = FileSystem.exists(resultPath)
+			? resultPath
+			: altResultPath
 
-		const content = await FileSystem.readFile(resultPath, 'utf8')
+		assert.ok(FileSystem.exists(resolvedResultPath), 'Result file should exist')
+
+		const content = await FileSystem.readFile(resolvedResultPath, 'utf8')
 		assert.strictEqual(content, 'success', 'File content should match')
-
-		// Cleanup
-		if (FileSystem.exists(path.join(projectRoot, 'src/resources/integration-test'))) {
-			await FileSystem.rmdir(
-				path.join(projectRoot, 'src/resources/integration-test'),
-				{ recursive: true },
-			)
-		}
 	} finally {
-		// Close Puppeteer browser (server mode doesn't auto-close)
-		await PuppeteerPageFactory.close()
+		await removeOutputDirs(outputDirs)
+		try {
+			await PuppeteerPageFactory.close()
+		} catch {
+			// Browser may not have launched if init failed
+		}
 
-		// Close server properly
 		if (server.listening) {
 			server.closeAllConnections?.()
 			await new Promise((resolve) => server.close(resolve))

@@ -2,14 +2,14 @@
 
 Since **webGrabber** entirely orchestrates the `puppeteer.launch()` mechanics for you, configuration takes place in a dedicated module file rather than hidden deep in standard CLI flags. 
 
-The configuration source of truth resides entirely in `src/config/options.js`.
+The configuration source of truth resides entirely in `src/config/puppeteerOptions.js`.
 
 ## Structuring the Options payload
 
 The file exports a plain JavaScript object precisely mimicking the [Puppeteer LaunchOptions Object](https://pptr.dev/api/puppeteer.launchoptions).
 
 ```javascript
-// src/config/options.js
+// src/config/puppeteerOptions.js
 export default {
   headless: 'new', // Using the modern Chrome headless pipeline
   args: ['--no-sandbox', '--disable-setuid-sandbox'], // Prevent Docker permission issues
@@ -30,7 +30,7 @@ Under the hood, webGrabber leverages `puppeteer-extra`. You can toggle two speci
 **Example for high-anon workflows:**
 
 ```javascript
-// src/config/options.js
+// src/config/puppeteerOptions.js
 export default {
   headless: false, // Run headful for maximum bot-detection bypass 
   args: [

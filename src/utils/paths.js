@@ -17,3 +17,10 @@ export const pathJoin = (...paths) => {
 export const basePathJoin = (...paths) => {
 	return pathJoin(__dirname, ...paths)
 }
+
+/**
+ * Join paths relative to project root
+ */
+export const rootPathJoin = (...paths) => {
+	return pathJoin(__dirname, '../..', ...paths)
+}

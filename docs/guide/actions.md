@@ -54,7 +54,7 @@ Manage window frames, navigation history, evaluating DOM queries, and screenshot
 
 ## 📂 Filesystem Orchestration
 
-Interact intelligently with the local host disk. Store payloads, read text dumps, or manage staging folders dynamically via automation.
+Interact with the local disk under the grab's output root (`output/<grab-name>/`, set automatically at the start of each run). Store payloads, read text dumps, or manage staging folders relative to that directory.
 
 | Action | Parameters | Description |
 |--------|------------|-------------|
@@ -93,5 +93,6 @@ Standard logic bridging modules and formatting normalizers bridging raw values i
 | `random` | `min` *(int)*, `max` *(int)* | Maps a randomized safe float execution scalar mapping string matching boundaries, storing perfectly directly to `INPUT`. |
 | `matchFromString` | `string` *(str)*, `regex` *(str)* | A robust generic string RegExp executer sequence mapped directly over the injected targeted string. |
 | `replaceString` | `string` *(str)* | Finds and forcibly overwrites specific sub-string signature payloads matching dynamic criteria blocks perfectly. |
+| `getExtension` | `string` *(str)* | Extracts the file extension (including the dot) from a path or filename and stores it in `INPUT`. |
 
 *To implement workflows not covered organically here, read the guide on declaring custom behaviors over [Custom Actions](./custom-actions.md).*

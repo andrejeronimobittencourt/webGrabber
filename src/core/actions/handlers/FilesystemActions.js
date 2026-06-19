@@ -1,57 +1,51 @@
 import constants from '../../../utils/constants.js'
-import { displayText } from '../../../utils/display.js'
-import { sanitizeString } from '../../../utils/utils.js'
-import { pathJoin, basePathJoin } from '../../../utils/paths.js'
-import { FileSystem } from '../../../utils/fileSystem.js'
+import { present } from '../../../infrastructure/presenter/present.js'
+import { sanitizeString } from '../../../utils/stringUtils.js'
+import { pathJoin, rootPathJoin } from '../../../utils/paths.js'
+import { FileSystem } from '../../../utils/FileSystem.js'
 import axios from 'axios'
 import cliProgress from 'cli-progress'
 
 export default class FilesystemActions {
 	static register(actionList) {
 		actionList.add('setBaseDir', async (brain) => {
-			const { dir } = brain.recall(constants.paramsKey)
-			brain.learn(constants.baseDirKey, basePathJoin(`../resources/${dir}`))
-			if (!FileSystem.exists(brain.recall(constants.baseDirKey)))
-				await FileSystem.mkdir(brain.recall(constants.baseDirKey))
+			const { dir } = brain.run.params
+			brain.fs.baseDir = rootPathJoin('output', dir)
+			if (!FileSystem.exists(brain.fs.baseDir))
+				await FileSystem.mkdir(brain.fs.baseDir)
 		})
 		actionList.add('setCurrentDir', async (brain) => {
-			let { dir, useBaseDir = false } = brain.recall(constants.paramsKey)
+			let { dir, useBaseDir = false } = brain.run.params
 			dir = sanitizeString(dir)
 			if (
 				!FileSystem.exists(
-					pathJoin(brain.recall(constants.currentDirKey), dir),
+					pathJoin(brain.fs.currentDir, dir),
 				)
 			)
 				throw new Error(`Directory ${dir} does not exist`)
-			displayText(
+			present(
 				[
 					{ text: ': Setting current dir to ', color: 'white', style: 'italic' },
 					{ text: dir, color: 'gray', style: 'italic' },
 				],
 				brain,
 			)
-			brain.learn(
-				constants.currentDirKey,
-				pathJoin(
-					useBaseDir ? brain.recall(constants.baseDirKey) : brain.recall(constants.currentDirKey),
-					dir,
-				),
+			brain.fs.currentDir = pathJoin(
+				useBaseDir ? brain.fs.baseDir : brain.fs.currentDir,
+				dir,
 			)
 		})
 		actionList.add('resetCurrentDir', async (brain) => {
-			brain.learn(constants.currentDirKey, brain.recall(constants.baseDirKey))
+			brain.fs.currentDir = brain.fs.baseDir
 		})
 		actionList.add('backToParentDir', async (brain) => {
-			if (brain.recall(constants.currentDirKey) === brain.recall(constants.baseDirKey)) return
-			brain.learn(
-				constants.currentDirKey,
-				brain.recall(constants.currentDirKey).split('/').slice(0, -1).join('/'),
-			)
+			if (brain.fs.currentDir === brain.fs.baseDir) return
+			brain.fs.currentDir = brain.fs.currentDir.split('/').slice(0, -1).join('/')
 		})
 		actionList.add('createDir', async (brain) => {
-			let { dir, useBaseDir = false } = brain.recall(constants.paramsKey)
+			let { dir, useBaseDir = false } = brain.run.params
 			dir = sanitizeString(dir)
-			displayText(
+			present(
 				[
 					{ text: ': Creating directory ', color: 'white', style: 'italic' },
 					{ text: dir, color: 'gray', style: 'italic' },
@@ -59,7 +53,7 @@ export default class FilesystemActions {
 				brain,
 			)
 			const dirPath = pathJoin(
-				useBaseDir ? brain.recall(constants.baseDirKey) : brain.recall(constants.currentDirKey),
+				useBaseDir ? brain.fs.baseDir : brain.fs.currentDir,
 				dir,
 			)
 			if (!FileSystem.exists(dirPath)) {
@@ -67,12 +61,12 @@ export default class FilesystemActions {
 			}
 		})
 		actionList.add('deleteFolder', async (brain) => {
-			const { foldername } = brain.recall(constants.paramsKey)
-			displayText(
+			const { foldername } = brain.run.params
+			present(
 				[
 					{ text: ': Deleting folder ', style: 'italic' },
 					{
-						text: `${brain.recall(constants.currentDirKey)}/${foldername}`,
+						text: `${brain.fs.currentDir}/${foldername}`,
 						color: 'gray',
 						style: 'italic',
 					},
@@ -81,24 +75,24 @@ export default class FilesystemActions {
 			)
 			if (
 				FileSystem.exists(
-					`${brain.recall(constants.currentDirKey)}/${foldername}`,
+					`${brain.fs.currentDir}/${foldername}`,
 				)
 			)
 				await FileSystem.rmdir(
-					`${brain.recall(constants.currentDirKey)}/${foldername}`,
+					`${brain.fs.currentDir}/${foldername}`,
 					{ recursive: true },
 				)
 		})
 		actionList.add('listFolders', async (brain) => {
-			displayText(
+			present(
 				[
 					{ text: ': Listing folders ', style: 'italic' },
-					{ text: `${brain.recall(constants.currentDirKey)}`, color: 'gray', style: 'italic' },
+					{ text: `${brain.fs.currentDir}`, color: 'gray', style: 'italic' },
 				],
 				brain,
 			)
 			const files = await FileSystem.readdir(
-				brain.recall(constants.currentDirKey),
+				brain.fs.currentDir,
 				{ withFileTypes: true },
 			)
 			const folders = files
@@ -107,26 +101,26 @@ export default class FilesystemActions {
 			brain.learn(constants.inputKey, folders)
 		})
 		actionList.add('createFile', async (brain) => {
-			const { filename, content = '' } = brain.recall(constants.paramsKey)
-			displayText(
+			const { filename, content = '' } = brain.run.params
+			present(
 				[
 					{ text: ': Creating file ', style: 'italic' },
-					{ text: `${brain.recall(constants.currentDirKey)}/${filename}.txt`, style: 'bold' },
+					{ text: `${brain.fs.currentDir}/${filename}.txt`, style: 'bold' },
 				],
 				brain,
 			)
 			await FileSystem.appendFile(
-				`${brain.recall(constants.currentDirKey)}/${filename}.txt`,
+				`${brain.fs.currentDir}/${filename}.txt`,
 				content,
 			)
 		})
 		actionList.add('readFromText', async (brain) => {
-			const { filename, breakLine = false } = brain.recall(constants.paramsKey)
-			displayText(
+			const { filename, breakLine = false } = brain.run.params
+			present(
 				[
 					{ text: ': Loading file ', style: 'italic' },
 					{
-						text: `${brain.recall(constants.currentDirKey)}/${filename}.txt`,
+						text: `${brain.fs.currentDir}/${filename}.txt`,
 						color: 'gray',
 						style: 'italic',
 					},
@@ -134,7 +128,7 @@ export default class FilesystemActions {
 				brain,
 			)
 			const content = await FileSystem.readFile(
-				`${brain.recall(constants.currentDirKey)}/${filename}.txt`,
+				`${brain.fs.currentDir}/${filename}.txt`,
 				'utf8',
 			)
 			if (breakLine) {
@@ -146,54 +140,48 @@ export default class FilesystemActions {
 			}
 		})
 		actionList.add('saveToText', async (brain) => {
-			const { key, filename } = brain.recall(constants.paramsKey)
+			const { key, filename } = brain.run.params
 			const content = brain.recall(key)
 			if (content) {
-				displayText(
-					[
-						{ text: ': Saving ', color: 'white', style: 'italic' },
-						{
-							text: `${brain.recall(constants.currentDirKey)}/${filename}.txt`,
-							color: 'gray',
-							style: 'italic',
-						},
-					],
-					brain,
-				)
+				present([
+					{ text: ': Saving ', color: 'white', style: 'italic' },
+					{
+						text: `${brain.fs.currentDir}/${filename}.txt`,
+						color: 'gray',
+						style: 'italic',
+					},
+				], brain)
 				await FileSystem.writeFile(
-					`${brain.recall(constants.currentDirKey)}/${filename}.txt`,
+					`${brain.fs.currentDir}/${filename}.txt`,
 					Array.isArray(content) ? content.join('\n') : content,
 				)
 			}
 		})
 		actionList.add('appendToText', async (brain) => {
-			const { key, filename } = brain.recall(constants.paramsKey)
+			const { key, filename } = brain.run.params
 			const content = brain.recall(key)
 			if (content) {
-				displayText(
-					[
-						{ text: ': Appending to ', color: 'white', style: 'italic' },
-						{
-							text: `${brain.recall(constants.currentDirKey)}/${filename}.txt`,
-							color: 'gray',
-							style: 'italic',
-						},
-					],
-					brain,
-				)
+				present([
+					{ text: ': Appending to ', color: 'white', style: 'italic' },
+					{
+						text: `${brain.fs.currentDir}/${filename}.txt`,
+						color: 'gray',
+						style: 'italic',
+					},
+				], brain)
 				await FileSystem.appendFile(
-					`${brain.recall(constants.currentDirKey)}/${filename}.txt`,
+					`${brain.fs.currentDir}/${filename}.txt`,
 					Array.isArray(content) ? content.join('\n') : content + '\n',
 				)
 			}
 		})
 		actionList.add('deleteFile', async (brain) => {
-			const { filename } = brain.recall(constants.paramsKey)
-			displayText(
+			const { filename } = brain.run.params
+			present(
 				[
 					{ text: ': Deleting file ', style: 'italic' },
 					{
-						text: `${brain.recall(constants.currentDirKey)}/${filename}.txt`,
+						text: `${brain.fs.currentDir}/${filename}.txt`,
 						color: 'gray',
 						style: 'italic',
 					},
@@ -202,20 +190,20 @@ export default class FilesystemActions {
 			)
 			if (
 				FileSystem.exists(
-					`${brain.recall(constants.currentDirKey)}/${filename}.txt`,
+					`${brain.fs.currentDir}/${filename}.txt`,
 				)
 			)
 				await FileSystem.unlink(
-					`${brain.recall(constants.currentDirKey)}/${filename}.txt`,
+					`${brain.fs.currentDir}/${filename}.txt`,
 				)
 		})
 		actionList.add('fileExists', async (brain) => {
-			const { filename } = brain.recall(constants.paramsKey)
-			displayText(
+			const { filename } = brain.run.params
+			present(
 				[
 					{ text: ': Checking if file exists ', style: 'italic' },
 					{
-						text: `${brain.recall(constants.currentDirKey)}/${filename}`,
+						text: `${brain.fs.currentDir}/${filename}`,
 						color: 'gray',
 						style: 'italic',
 					},
@@ -223,17 +211,17 @@ export default class FilesystemActions {
 				brain,
 			)
 			const exists = FileSystem.exists(
-				`${brain.recall(constants.currentDirKey)}/${filename}`,
+				`${brain.fs.currentDir}/${filename}`,
 			)
 			brain.learn(constants.inputKey, exists)
 		})
 		actionList.add('checkStringInFile', async (brain) => {
-			const { filename, string } = brain.recall(constants.paramsKey)
-			displayText(
+			const { filename, string } = brain.run.params
+			present(
 				[
 					{ text: ': Checking if string is in file ', style: 'italic' },
 					{
-						text: `${brain.recall(constants.currentDirKey)}/${filename}.txt`,
+						text: `${brain.fs.currentDir}/${filename}.txt`,
 						color: 'gray',
 						style: 'italic',
 					},
@@ -241,18 +229,18 @@ export default class FilesystemActions {
 				brain,
 			)
 			const content = await FileSystem.readFile(
-				`${brain.recall(constants.currentDirKey)}/${filename}.txt`,
+				`${brain.fs.currentDir}/${filename}.txt`,
 				'utf8',
 			)
 			brain.learn(constants.inputKey, content.includes(string))
 		})
 		actionList.add('download', async (brain) => {
-			const { url, filename, host, showProgress = true } = brain.recall(constants.paramsKey)
+			const { url, filename, host, showProgress = true } = brain.run.params
 			const name = filename ?? url.split('/').pop()
 			const sanitizedFilename = sanitizeString(name)
 			const needsHost = !url.startsWith('http')
 
-			displayText(
+			present(
 				[
 					{ text: ': Downloading ', color: 'white', style: 'italic' },
 					{ text: name, color: 'gray', style: 'italic' },
@@ -266,7 +254,7 @@ export default class FilesystemActions {
 			})
 
 			const writer = FileSystem.createWriteStream(
-				`${brain.recall(constants.currentDirKey)}/${sanitizedFilename}`,
+				`${brain.fs.currentDir}/${sanitizedFilename}`,
 			)
 
 			let progressBar

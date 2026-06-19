@@ -1,11 +1,13 @@
 class Grab {
 	#name
 	#description
+	#verbose
 	#actions
 
 	constructor(grab) {
 		this.#name = grab.name
 		this.#description = grab.description || 'No description provided'
+		this.#verbose = grab.verbose ?? 1
 		this.#actions = grab.actions
 	}
 
@@ -15,6 +17,10 @@ class Grab {
 
 	get description() {
 		return this.#description
+	}
+
+	get verbose() {
+		return this.#verbose
 	}
 
 	get actions() {

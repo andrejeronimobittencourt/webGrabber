@@ -1,5 +1,4 @@
-import { displayText } from './display.js'
-
+import { present } from '../infrastructure/presenter/present.js'
 /**
  * Retry a function with exponential backoff
  * @param {Function} fn - Async function to retry
@@ -35,16 +34,13 @@ export const retryWithBackoff = async (fn, options = {}) => {
 			const currentDelay = Math.min(delay, maxDelay)
 
 			if (brain) {
-				displayText(
-					[
-						{
-							text: `: Retry ${attempt}/${maxAttempts} after ${currentDelay}ms`,
-							color: 'yellow',
-							style: 'italic',
-						},
-					],
-					brain,
-				)
+				present([
+					{
+						text: `: Retry ${attempt}/${maxAttempts} after ${currentDelay}ms`,
+						color: 'yellow',
+						style: 'italic',
+					},
+				], brain)
 			}
 
 			// Call retry callback if provided
