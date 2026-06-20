@@ -22,11 +22,12 @@ export default class Grabber {
 	 * Register a custom action handler.
 	 * @param {string} name
 	 * @param {Function} action
+	 * @param {{ serverBlocked?: boolean }} [options]
 	 */
-	addCustomAction(name, action) {
+	addCustomAction(name, action, options = {}) {
 		if (typeof action !== 'function') throw new Error(`Action ${name} must be a function`)
 		if (this.#coreActionList.has(name) || this.#customActionList.has(name)) throw new Error(`Action ${name} already exists`)
-		this.#customActionList.add(name, action)
+		this.#customActionList.add(name, action, options)
 	}
 
 	/**

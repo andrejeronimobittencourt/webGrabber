@@ -96,7 +96,7 @@ export default class BrowserActions {
 				type: validatedType,
 				fullPage: fullPage ? fullPage : true,
 			})
-		})
+		}, { serverBlocked: true })
 		actionList.add('screenshotElement', async (brain, page) => {
 			const { name, type, selector } = brain.run.params
 			const validatedType = ['jpeg', 'png'].includes(type) ? type : 'png'
@@ -128,7 +128,7 @@ export default class BrowserActions {
 					height: totalHeight,
 				},
 			})
-		})
+		}, { serverBlocked: true })
 		actionList.add('getElements', async (brain, page) => {
 			const { selector, attribute } = brain.run.params
 			let content = []

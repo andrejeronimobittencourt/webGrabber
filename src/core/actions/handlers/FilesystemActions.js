@@ -34,14 +34,14 @@ export default class FilesystemActions {
 				useBaseDir ? brain.fs.baseDir : brain.fs.currentDir,
 				dir,
 			)
-		})
+		}, { serverBlocked: true })
 		actionList.add('resetCurrentDir', async (brain) => {
 			brain.fs.currentDir = brain.fs.baseDir
 		})
 		actionList.add('backToParentDir', async (brain) => {
 			if (brain.fs.currentDir === brain.fs.baseDir) return
 			brain.fs.currentDir = brain.fs.currentDir.split('/').slice(0, -1).join('/')
-		})
+		}, { serverBlocked: true })
 		actionList.add('createDir', async (brain) => {
 			let { dir, useBaseDir = false } = brain.run.params
 			dir = sanitizeString(dir)
@@ -59,7 +59,7 @@ export default class FilesystemActions {
 			if (!FileSystem.exists(dirPath)) {
 				await FileSystem.mkdir(dirPath)
 			}
-		})
+		}, { serverBlocked: true })
 		actionList.add('deleteFolder', async (brain) => {
 			const { foldername } = brain.run.params
 			present(
@@ -82,7 +82,7 @@ export default class FilesystemActions {
 					`${brain.fs.currentDir}/${foldername}`,
 					{ recursive: true },
 				)
-		})
+		}, { serverBlocked: true })
 		actionList.add('listFolders', async (brain) => {
 			present(
 				[
@@ -99,7 +99,7 @@ export default class FilesystemActions {
 				.filter((dirent) => dirent.isDirectory())
 				.map((dirent) => dirent.name)
 			brain.learn(constants.inputKey, folders)
-		})
+		}, { serverBlocked: true })
 		actionList.add('createFile', async (brain) => {
 			const { filename, content = '' } = brain.run.params
 			present(
@@ -113,7 +113,7 @@ export default class FilesystemActions {
 				`${brain.fs.currentDir}/${filename}.txt`,
 				content,
 			)
-		})
+		}, { serverBlocked: true })
 		actionList.add('readFromText', async (brain) => {
 			const { filename, breakLine = false } = brain.run.params
 			present(
@@ -138,7 +138,7 @@ export default class FilesystemActions {
 				// add to brain using a string
 				brain.learn(constants.inputKey, content)
 			}
-		})
+		}, { serverBlocked: true })
 		actionList.add('saveToText', async (brain) => {
 			const { key, filename } = brain.run.params
 			const content = brain.recall(key)
@@ -156,7 +156,7 @@ export default class FilesystemActions {
 					Array.isArray(content) ? content.join('\n') : content,
 				)
 			}
-		})
+		}, { serverBlocked: true })
 		actionList.add('appendToText', async (brain) => {
 			const { key, filename } = brain.run.params
 			const content = brain.recall(key)
@@ -174,7 +174,7 @@ export default class FilesystemActions {
 					Array.isArray(content) ? content.join('\n') : content + '\n',
 				)
 			}
-		})
+		}, { serverBlocked: true })
 		actionList.add('deleteFile', async (brain) => {
 			const { filename } = brain.run.params
 			present(
@@ -196,7 +196,7 @@ export default class FilesystemActions {
 				await FileSystem.unlink(
 					`${brain.fs.currentDir}/${filename}.txt`,
 				)
-		})
+		}, { serverBlocked: true })
 		actionList.add('fileExists', async (brain) => {
 			const { filename } = brain.run.params
 			present(
@@ -214,7 +214,7 @@ export default class FilesystemActions {
 				`${brain.fs.currentDir}/${filename}`,
 			)
 			brain.learn(constants.inputKey, exists)
-		})
+		}, { serverBlocked: true })
 		actionList.add('checkStringInFile', async (brain) => {
 			const { filename, string } = brain.run.params
 			present(
@@ -233,7 +233,7 @@ export default class FilesystemActions {
 				'utf8',
 			)
 			brain.learn(constants.inputKey, content.includes(string))
-		})
+		}, { serverBlocked: true })
 		actionList.add('download', async (brain) => {
 			const { url, filename, host, showProgress = true } = brain.run.params
 			const name = filename ?? url.split('/').pop()
@@ -288,6 +288,6 @@ export default class FilesystemActions {
 				})
 				writer.on('error', reject)
 			})
-		})
+		}, { serverBlocked: true })
 	}
 }

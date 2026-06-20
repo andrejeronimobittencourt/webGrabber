@@ -3,12 +3,6 @@
 	"description": "Integration test for webGrabber",
 	"actions": [
 		{
-			"name": "setBaseDir",
-			"params": {
-				"dir": "integration_test"
-			}
-		},
-		{
 			"name": "puppeteer",
 			"params": {
 				"func": "goto",
@@ -42,10 +36,9 @@
 			}
 		},
 		{
-			"name": "saveToText",
+			"name": "getVariable",
 			"params": {
-				"key": "TEST_VAR",
-				"filename": "result"
+				"key": "TEST_VAR"
 			}
 		}
 	]

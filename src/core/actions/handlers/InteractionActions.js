@@ -216,6 +216,6 @@ export default class InteractionActions {
 				retryOn: isRetryableError,
 				brain,
 			})
-		})
+		}, { serverBlocked: true })
 	}
 }

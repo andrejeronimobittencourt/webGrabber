@@ -1,46 +1,44 @@
 # Execution & Server Mode
 
-**webGrabber** features a deeply robust architecture allowing runtime logic to either execute offline, sequentially, or run on a dedicated HTTP backend listening for payload events. 
+**webGrabber** runs offline via the CLI or as an HTTP server that accepts grab payloads on `POST /grab`.
 
-## Command Line Standard (Local Mode)
+## Command Line (Local Mode)
 
-If you have grab payload configs nested correctly directly under `grabs/`, executing a run is straightforward. 
+Grab configs live in `grabs/` at the project root.
 
 ```bash
-# Execute *all* JSON/YAML configs sequentially
-npm run start 
+# Run all grabs sequentially
+npm run start
 
-# Target only a specific grab named log-workflow
+# Run one grab by name
 npm run start log-workflow
 ```
 
-### Inspecting Grabs via CLI
-
-If you have assigned a `description` property to your grab configurations, you can easily inspect your library of automation flows from the terminal:
+### Inspecting Grabs
 
 ```bash
-# Lists all registered grabs & their descriptions
 npm run help
 ```
 
-## Running the Server backend
+Lists grabs that have a `description` property.
 
-If you wish to spin up a standalone container or a microservice acting exclusively as a scrape-engine API, webGrabber provides an optimized Express web server. This server dynamically registers payloads via HTTP `POST`.
+### Quiet CLI output
+
+Set `"verbose": 0` on a grab file to suppress internal engine output. The `log` action still prints. Ignored in server mode.
+
+## Server Mode
 
 ```bash
 npm run start:server
-# Server started on port 3000
 ```
-*(Optionally modify port binding by assigning `PORT=8080` in `.env`)*
 
-### Sending Requests to the Engine
+Default port `3000`; override with `PORT` in `.env`.
 
-The server exposes a main route at `/grab`. 
+### `POST /grab`
+
 - **Endpoint:** `POST http://localhost:3000/grab`
-- **Rate Limited:** The IP-level rate-limiter prevents spamming bots.
-- **Payload Schema:** Requires dynamic JSON mapping directly to `name` & `actions`.
-
-Executing the engine using `cURL`:
+- **Body:** Full grab JSON (`name`, `actions`, optional `description`, `verbose`)
+- **Rate limited** per IP
 
 ```bash
 curl -X POST http://localhost:3000/grab \
@@ -48,23 +46,36 @@ curl -X POST http://localhost:3000/grab \
   -d '{
         "name": "login-flow",
         "actions": [
-          { "name": "log", "params": { "message": "Triggered via HTTP!" } }
+          { "name": "setVariable", "params": { "key": "STATUS", "value": "ok" } },
+          { "name": "getVariable", "params": { "key": "STATUS" } }
         ]
       }'
 ```
 
-### Response Mapping
+### Blocked actions in server runs
 
-The request evaluates the browser flow, awaits execution closure, and replies natively with a detailed schema documenting duration lengths, metadata payloads, extracted memory outputs (`INPUT`), and potential parsing errors.
+`POST /grab` runs set `brain.run.payloadId`. Actions registered with `{ serverBlocked: true }` throw `ActionError` and return HTTP 500.
+
+Blocked: `userInput`, `log`, `screenshot`, `screenshotElement`, `login`, `setCurrentDir`, `backToParentDir`, `createDir`, `deleteFolder`, `deleteFile`, `listFolders`, `createFile`, `readFromText`, `saveToText`, `appendToText`, `fileExists`, `checkStringInFile`, `download`.
+
+Still allowed: browser/interaction actions, variables, control flow, and utilities such as `sleep`, `random`, `matchFromSelector`. The engine still calls `setBaseDir` and `resetCurrentDir` internally on every run.
+
+### Responses
+
+**Success (`200`):** returns the final `INPUT` pipe value wrapped in `result`:
 
 ```json
 {
-  "id": "e88d1d87-5b65-4f0e-bdf7-e17f2bc29255",
-  "grabName": "login-flow",
-  "status": "success",
-  "duration": 1250 
+  "result": "value from last action that wrote INPUT"
 }
 ```
 
-> [!INFO] Roadmap
-> Extended return information, custom return typings, and deeper nested payloads sent back through the API response are officially planned for the future roadmap. Currently, server return topologies are functionally limited to the basic schema documented above!
+If nothing wrote `INPUT`, `result` is `undefined`/absent depending on the last step.
+
+**Failure (`500`):** plain text body:
+
+```
+Internal Server Error
+```
+
+Structured error JSON, request IDs in the response body, and duration metadata are not returned to the client today. Failures are logged server-side via Winston.

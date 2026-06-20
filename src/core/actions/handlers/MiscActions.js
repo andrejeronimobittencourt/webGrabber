@@ -25,11 +25,11 @@ export default class MiscActions {
 					throw new Error(e)
 				}
 			})()
-		})
+		}, { serverBlocked: true })
 		actionList.add('log', async (brain) => {
 			const { message, color, background } = brain.run.params
 			present([{ text: `: ${message}`, color, background, style: 'italic' }], brain, { force: true })
-		})
+		}, { serverBlocked: true })
 		actionList.add('sleep', async (brain) => {
 			const { ms } = brain.run.params
 			present([

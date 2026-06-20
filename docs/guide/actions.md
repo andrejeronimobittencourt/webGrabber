@@ -1,98 +1,105 @@
 # Built-in Actions Reference
 
-**webGrabber** provides a comprehensive suite of built-in actions designed to rapidly piece together complex scraping or automation workflows. Actions are categorized by their primary domain of responsibility.
+**webGrabber** provides built-in actions for scraping and automation workflows. Parameter types below match the runtime Zod schemas.
+
+Actions marked **server: no** cannot be used in `POST /grab` payloads (inline server runs). See [Server Mode](./server-mode.md#blocked-actions-in-server-runs).
 
 ---
 
 ## 💾 Variables & Memory
 
-Manage the internal state of the current grab run. Use these actions to store, increment, or extract data payloads dynamically.
-
 | Action | Parameters | Description |
 |--------|------------|-------------|
-| `setVariable` | `key` *(str)*, `value` *(str)* | Statically bind a key-value pair into the memory buffer. Can be interpolated later via <code v-pre>{{key}}</code>. |
-| `getVariable` | `key` *(str)*, `index` *(str)* | Fetches an exact key. Automatically populates the global `INPUT` pipe. Use `index` to slice array values. |
-| `appendToVariable` | `key` *(str)*, `value` *(str)* | String concatenation. Appends the `value` to the existing memory `key`. |
-| `deleteVariable` | `key` *(str)* | Hard deletes the specified `key` from the running memory pool. |
-| `transferVariable` | `from` *(str)*, `to` *(str)* | Safely clones the value mapping from one memory `key` directly into another target binding. |
-| `countStart` | `key` *(str)*, `value` *(str)* | Initializes a numerical counter integer under the specified `key`. Defaults to `0` if no value explicitly given. |
-| `countIncrement` | `key` *(str)* | Increments the numerical counter corresponding to `key` by `1`. |
-| `countDecrement` | `key` *(str)* | Decrements the numerical counter corresponding to `key` by `1`. |
+| `setVariable` | `key` *(str)*, `value` *(any)* | Store a value in script memory. Interpolate later via <code v-pre>{{key}}</code>. |
+| `getVariable` | `key` *(str)*, `index` *(int, opt)* | Load a key into `INPUT`. Use `index` when the stored value is an array. |
+| `appendToVariable` | `key` *(str)*, `value` *(any)* | Append to an existing string value. |
+| `deleteVariable` | `key` *(str)* | Remove a key from script memory. |
+| `transferVariable` | `from` *(str)*, `to` *(str)*, `index` *(int, opt)*, `key` *(str, opt)* | Copy a value from one key to another. |
+| `countStart` | `key` *(str)*, `value` *(int, opt)* | Initialize a counter (default `0`). |
+| `countIncrement` | `key` *(str)* | Increment counter by `1`. |
+| `countDecrement` | `key` *(str)* | Decrement counter by `1`. |
 
 ---
 
 ## 🖱️ Interaction & Input
 
-Drive the headless browser directly using Puppeteer's underlying API to simulate natural human inputs.
-
 | Action | Parameters | Description |
 |--------|------------|-------------|
-| `type` | `selector` *(str)*, `text` *(str)*, `secret` *(str)* | Focuses on an input node and types exactly the provided `text`. Masks logs if `secret` is true. |
-| `click` | `selector` *(str)*, `text` *(str)* | Fires a mouse click sequence. Can optionally fuzzy match button values if `text` is provided. |
-| `clickAll` | `selector` *(str)* | Finds an array of DOM nodes matching the selector and dispatches a concurrent click on all. |
-| `login` | `url`, `usernameSelector`, `username`, `passwordSelector`, `password`, `submitSelector`, `cookieName` *(opt)* | High-level macro. Bootstraps a full login sequence targeting specific fields and clicks submit. Auto-saves session cookies to disk. Providing `cookieName` (the specific string key of your auth cookie, e.g., 'jwt_token') allows the engine to isolate the correct cookie and check its expiry timestamp. If valid, it natively restores the session and skips the login form. |
-| `scrollWaitClick` | `selector` *(str)*, `ms` *(str)* | Forces the viewport to scroll until the `selector` intersects the screen, waits `ms`, then clicks. |
+| `type` | `selector` *(str)*, `text` *(str)*, `secret` *(bool, opt)* | Type into an input. Masks logs when `secret` is true. |
+| `click` | `selector` *(str)*, `text` *(str, opt)*, `attribute` *(str, opt)* | Click a matching element. Optional `text` fuzzy match. |
+| `clickAll` | `selector` *(str)* | Click all elements matching the selector. |
+| `login` **server: no** | `url`, `usernameSelector`, `username`, `passwordSelector`, `password`, `submitSelector`, `cookieName` *(str, opt)* | Full login flow with optional cookie reuse via `cookieName`. |
+| `scrollWaitClick` | `selector` *(str)*, `ms` *(int, opt)* | Scroll into view, wait, then click. |
 
 ---
 
 ## 🌐 Browser Manipulation
 
-Manage window frames, navigation history, evaluating DOM queries, and screenshots.
-
 | Action | Parameters | Description |
 |--------|------------|-------------|
-| `puppeteer` | `func` *(str)* | The most versatile bridging action. Dispatches a raw string function literal onto the Puppeteer Page object. Examples: `goto`, `reload`. |
-| `newPage` | `pageKey` *(str)* | Spins up a new browser tab/frame instance and records the handle inside the engine registry under `pageKey`. |
-| `switchPage` | `pageKey` *(str)* | Rotates the execution scope and viewport focus cleanly onto the specified `pageKey` identifier. |
-| `closePage` | `pageKey` *(str)* | Safely terminates and garbage collects the specific tab mapping. |
-| `screenshot` | `name` *(str)*, `fullPage` *(bool)* | Dumps a `.png` snapshot mapping to the viewport buffer. Defaults to the visible boundaries unless `fullPage` is true. |
-| `screenshotElement`| `name` *(str)*, `selector` *(str)* | Dumps a highly focused `.png` snapshot specifically bounded merely to the matched element coordinates. |
-| `getElements` | `selector` *(str)*, `attribute` *(str)* | Evaluates `querySelectorAll`. Maps returning values cleanly into the global `INPUT` pipe for extraction. |
-| `elementExists` | `selector` *(str)* | Performs a non-blocking fast DOM check assessing if the matching node is currently painted on DOM. |
+| `puppeteer` | `func` *(str)*, `func2` *(str, opt)*, … | Call a Puppeteer page method. Extra keys pass through (e.g. `url` for `goto`). |
+| `newPage` | `pageKey` *(str)* | Open a tab and register it under `pageKey`. |
+| `switchPage` | `pageKey` *(str)* | Set the active tab. |
+| `closePage` | `pageKey` *(str)* | Close a tab. |
+| `screenshot` **server: no** | `name` *(str)*, `type` *(`jpeg` \| `png`, opt)*, `fullPage` *(bool, opt)* | Save a viewport screenshot. |
+| `screenshotElement` **server: no** | `name` *(str)*, `selector` *(str)*, `type` *(`jpeg` \| `png`, opt)* | Screenshot a single element. |
+| `getElements` | `selector` *(str)*, `attribute` *(str, opt)* | Query all matches; result → `INPUT`. |
+| `getChildren` | `selectorParent` *(str)*, `selectorChild` *(str)*, `attribute` *(str, opt)* | Query children under a parent; result → `INPUT`. |
+| `elementExists` | `selector` *(str)* | Check DOM presence → `INPUT` (boolean). |
 
 ---
 
 ## 📂 Filesystem Orchestration
 
-Interact with the local disk under the grab's output root (`output/<grab-name>/`, set automatically at the start of each run). Store payloads, read text dumps, or manage staging folders relative to that directory.
+Paths are relative to the grab output root (`output/<grab-name>/`), set automatically at run start.
 
 | Action | Parameters | Description |
 |--------|------------|-------------|
-| `createDir` | `dir` *(str)* | Instantiates a new arbitrary system directory path mapping. |
-| `createFile` | `filename` *(str)*, `content` *(str)* | Generates a new utf-8 file block instantly dumping the stringified `content`. |
-| `listFolders` | *None* | Maps a tree listing of the actively executing directory root, outputting directly to `INPUT`. |
-| `fileExists` | `filename` *(str)* | Verifies if the fully qualified target filename is resolvable on disk geometry. |
-| `download` | `url` *(str)*, `filename` *(str)* | Stream-downloads the binary signature from the targeting absolute `url` payload directly into an offline file payload. |
-| `saveToText` | `key` *(str)*, `filename` *(str)* | Retrieves the active value nested in memory context (`key`) and strictly binds the entire string directly onto disk format (`filename`). |
-| `readFromText` | `filename` *(str)* | Maps the entire utf-8 contents of a strictly defined local directory file block, cleanly emitting back directly to `INPUT`. |
+| `setBaseDir` | `dir` *(str)* | Override base output directory (normally set by the engine). |
+| `setCurrentDir` **server: no** | `dir` *(str)*, `useBaseDir` *(bool, opt)* | Change working directory. |
+| `resetCurrentDir` | — | Reset working directory to base. |
+| `backToParentDir` **server: no** | — | Move working directory up one level. |
+| `createDir` **server: no** | `dir` *(str)*, `useBaseDir` *(bool, opt)* | Create a directory. |
+| `deleteFolder` **server: no** | `foldername` *(str)* | Delete a folder recursively. |
+| `listFolders` **server: no** | — | List folders in current dir → `INPUT`. |
+| `createFile` **server: no** | `filename` *(str)*, `content` *(str, opt)* | Create a UTF-8 file. |
+| `readFromText` **server: no** | `filename` *(str)*, `breakLine` *(bool, opt)* | Read file contents → `INPUT`. |
+| `saveToText` **server: no** | `key` *(str)*, `filename` *(str)* | Write script memory value to file. |
+| `appendToText` **server: no** | `key` *(str)*, `filename` *(str)* | Append script memory value to file. |
+| `deleteFile` **server: no** | `filename` *(str)* | Delete a file. |
+| `fileExists` **server: no** | `filename` *(str)* | Check file existence → `INPUT` (boolean). |
+| `checkStringInFile` **server: no** | `filename` *(str)*, `string` *(str)* | Search file for string → `INPUT` (boolean). |
+| `download` **server: no** | `url` *(str)*, `filename` *(str, opt)*, `host` *(str, opt)*, `showProgress` *(bool, opt)* | Download a URL to disk. |
 
 ---
 
 ## 🔀 Control Flow
 
-Conditionally route the declarative grab arrays. Loops and logical branch evaluations dynamically execute action shards seamlessly.
+Nested `actions` / `elseActions` values are arrays of action objects (same shape as root `actions`).
 
 | Action | Parameters | Description |
 |--------|------------|-------------|
-| `if` | `condition` *(str)*, `actions` *(str)* | Evaluates a plain JS-compatible string literal boolean `condition`. If truthy, deeply processes the injected sub-array. |
-| `ifElse` | `condition` *(str)*, `actions` *(str)* | Same evaluation loop hook, providing an explicit fall-back `elseActions` array sequence routing block payload. |
-| `while` | `condition` *(str)*, `actions` *(str)* | Traverses indefinitely processing the nested sub-array payload blocks recursively as long as the memory boundary mapping holds true. |
-| `for` | `from` *(int)*, `until` *(int)* | Steps iteratively between integer `from` constraints. |
-| `forEach` | `key` *(str)*, `actions` *(str)* | Highly practical mapping iteration block strictly bounded directly against a target object layout bound into memory contextualized `key`. |
+| `if` | `condition` *(str)*, `actions` *(array)* | Run nested actions when condition is truthy. |
+| `ifElse` | `condition` *(str)*, `actions` *(array)*, `elseActions` *(array)* | Conditional branch with else block. |
+| `while` | `condition` *(str)*, `actions` *(array)* | Loop while condition is truthy. |
+| `for` | `from` *(int)*, `until` *(int)*, `step` *(int, opt)*, `actions` *(array)* | Numeric loop (`step` defaults to `1`). |
+| `forEach` | `key` *(str)*, `actions` *(array)* | Iterate array stored in script memory under `key`. |
 
 ---
 
 ## 🛠️ Utilities
 
-Standard logic bridging modules and formatting normalizers bridging raw values into sanitized text pipelines.
-
 | Action | Parameters | Description |
 |--------|------------|-------------|
-| `log` | `message` *(str)*, `color` *(str)* | Outputs an environment logger message block mapping. Safely evaluates global <code v-pre>{{}}</code> interpolation string signatures natively. |
-| `sleep` | `ms` *(int)* | Forcibly hooks into a Promise setTimeout pause interval, unconditionally freezing execution routines indefinitely matching `ms`. |
-| `random` | `min` *(int)*, `max` *(int)* | Maps a randomized safe float execution scalar mapping string matching boundaries, storing perfectly directly to `INPUT`. |
-| `matchFromString` | `string` *(str)*, `regex` *(str)* | A robust generic string RegExp executer sequence mapped directly over the injected targeted string. |
-| `replaceString` | `string` *(str)* | Finds and forcibly overwrites specific sub-string signature payloads matching dynamic criteria blocks perfectly. |
-| `getExtension` | `string` *(str)* | Extracts the file extension (including the dot) from a path or filename and stores it in `INPUT`. |
+| `log` **server: no** | `message` *(str)*, `color` *(str, opt)*, `background` *(str, opt)* | Print a message. Always shown in CLI, even when `verbose: 0`. |
+| `sleep` | `ms` *(int)* | Pause execution (max 300000 ms). |
+| `random` | `min` *(int)*, `max` *(int)* | Random integer in range → `INPUT`. |
+| `uuid` | — | Generate UUID → `INPUT`. |
+| `sanitizeString` | `string` *(str)* | Strip invalid characters → `INPUT`. |
+| `replaceString` | `string` *(str)*, `search` *(str)*, `replace` *(str)* | String replace → `INPUT`. |
+| `matchFromString` | `string` *(str)*, `regex` *(str)* | First regex match → `INPUT`. |
+| `matchFromSelector` | `selector` *(str)*, `regex` *(str)*, `attribute` *(str, opt)* | Regex matches on page content → `INPUT`. |
+| `getExtension` | `string` *(str)* | File extension via `path.extname` → `INPUT`. |
+| `userInput` **server: no** | `query` *(str)* | Prompt on stdin → `INPUT`. |
 
-*To implement workflows not covered organically here, read the guide on declaring custom behaviors over [Custom Actions](./custom-actions.md).*
+*For actions not covered here, see [Custom Actions](./custom-actions.md).*

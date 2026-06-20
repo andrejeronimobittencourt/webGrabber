@@ -4,10 +4,12 @@ Grabs are the heart of **webGrabber**. A grab is a purely declarative definition
 
 ## The Basic Structure
 
-A grab file should be stored inside the `grabs/` directory. Each file understands three core root properties:
-- `name` *(string)*: A unique identifier for the payload (required).
-- `description` *(string)*: An optional human-readable summary of what the flow achieves.
-- `actions` *(array)*: A sequential array of automation steps to execute (required).
+A grab file should be stored inside the `grabs/` directory. Root properties:
+
+- `name` *(string, required)*: Unique identifier (letters, numbers, hyphens, underscores).
+- `description` *(string, optional)*: Shown by `npm run help`.
+- `verbose` *(integer, optional)*: CLI output level. Default `1`. Use `0` to silence engine output; `log` actions still print. Ignored in server mode.
+- `actions` *(array, required)*: Sequential steps to execute.
 
 ### JSON Syntax
 
@@ -44,7 +46,7 @@ When a grab runs, the engine automatically calls `setBaseDir` using the grab's `
 output/<grab-name>/
 ```
 
-For example, a grab named `example-test` writes files under `output/example-test/`. This folder is created at runtime and is gitignored — only `output/.gitkeep` is tracked in the repository.
+For example, a grab named `example-test` writes files under `output/example-test/`.
 
 Place your grab configs in `grabs/` at the project root; generated artifacts land in `output/`, keeping source and run results separate.
 
@@ -97,3 +99,7 @@ Grab scripts store user-defined variables via `setVariable`, `getVariable`, and 
 Engine runtime state (browser tabs, filesystem paths, verbose level, action params) is **not** stored in script memory. It lives on namespaced brain properties (`brain.browser`, `brain.fs`, `brain.presenter`, `brain.run`) and is managed internally by the engine.
 
 Avoid using `INPUT` as a long-lived variable name in `setVariable` — reserve it for step-to-step piping.
+
+## Upgrading from 4.x
+
+See [Migration (4.x → 5.0)](./migration.md).

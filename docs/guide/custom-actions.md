@@ -45,8 +45,10 @@ The `brain` object exposes script memory and namespaced runtime state:
 - **`brain.learn(key, value)` / `brain.recall(key)`**: Script variables and the `INPUT` pipe. Env vars prefixed with `GRABBER_` are synced into script memory at startup.
 - **`brain.recall('INPUT')` / `brain.learn('INPUT', ...)`**: Fetch or mutate the pipe value from the immediately preceding action.
 - **`brain.run.params`**: Params for the current action (from the grab file).
+- **`brain.run.payloadId`**: Server request ID (server mode only).
 - **`brain.browser.pages` / `brain.browser.activePage`**: Open Puppeteer tabs and the focused page.
 - **`brain.fs.baseDir` / `brain.fs.currentDir`**: Output root (`output/<grab-name>/`) and the active working subdirectory.
+- **`brain.presenter.verbose` / `brain.presenter.indentation`**: Output formatting (rarely needed in custom actions).
 
 ### 2. `page` (Puppeteer Frame Object)
 Passes the active [Puppeteer Page](https://pptr.dev/api/puppeteer.page) reference pointing at the target window viewport context. Utilize native Puppeteer commands.

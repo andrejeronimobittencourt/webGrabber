@@ -1,13 +1,24 @@
 import { interpolation } from '../../utils/interpolation.js'
 import { present } from '../../infrastructure/presenter/present.js'
 import { validateActionParams } from '../../schemas/actionSchemas.js'
+import { ActionError } from '../../errors/ActionErrors.js'
 import logger from '../../utils/logger.js'
 
 class Action {
 	#action
+	#serverBlocked
 
-	constructor(action) {
+	/**
+	 * @param {Function} action
+	 * @param {{ serverBlocked?: boolean }} [options]
+	 */
+	constructor(action, { serverBlocked = false } = {}) {
 		this.#action = action
+		this.#serverBlocked = serverBlocked
+	}
+
+	get serverBlocked() {
+		return this.#serverBlocked
 	}
 
 	async run(brain, page) {
@@ -22,9 +33,14 @@ export class ActionList {
 		this.#list = new Map()
 	}
 
-	add(name, action) {
+	/**
+	 * @param {string} name
+	 * @param {Function} action
+	 * @param {{ serverBlocked?: boolean }} [options]
+	 */
+	add(name, action, options = {}) {
 		if (this.#list.has(name)) throw new Error(`Action ${name} already exists`)
-		this.#list.set(name, new Action(action))
+		this.#list.set(name, new Action(action, options))
 	}
 
 	has(name) {
@@ -32,6 +48,9 @@ export class ActionList {
 	}
 
 	async run(name, brain, page) {
+		const entry = this.#list.get(name)
+		if (brain.run.payloadId && entry.serverBlocked) throw new ActionError(name, 'not available in server mode')
+
 		const startTime = Date.now()
 
 		logger.debug(`Starting action: ${name}`)
@@ -47,10 +66,8 @@ export class ActionList {
 		if (brain.run.params) {
 			let params = brain.run.params
 
-			// First interpolate variables
 			params = interpolation(params, brain)
 
-			// Then validate parameters
 			try {
 				params = validateActionParams(name, params)
 			} catch (validationError) {
@@ -65,7 +82,7 @@ export class ActionList {
 		}
 
 		try {
-			await this.#list.get(name).run(brain, page)
+			await entry.run(brain, page)
 
 			const duration = Date.now() - startTime
 			logger.info('Action completed', {
