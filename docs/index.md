@@ -22,7 +22,7 @@ hero:
 
 features:
   - title: Declarative Grabs
-    details: Author scraping or automation workflows as simple JSON or YAML files in `grabs/`; run output is written to `output/`.
+    details: Author scraping or automation workflows as simple JSON or YAML files in `grabs/`.
   - title: Reusable Actions
     details: Chain robust built-in actions for navigation, extraction, and filesystem interactions.
   - title: Powerful Interpolation
