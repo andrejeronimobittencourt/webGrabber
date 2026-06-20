@@ -99,7 +99,3 @@ Grab scripts store user-defined variables via `setVariable`, `getVariable`, and 
 Engine runtime state (browser tabs, filesystem paths, verbose level, action params) is **not** stored in script memory. It lives on namespaced brain properties (`brain.browser`, `brain.fs`, `brain.presenter`, `brain.run`) and is managed internally by the engine.
 
 Avoid using `INPUT` as a long-lived variable name in `setVariable` — reserve it for step-to-step piping.
-
-## Upgrading from 4.x
-
-See [Migration (4.x → 5.0)](./migration.md).
