@@ -11,7 +11,7 @@ Grab configs live in `grabs/` at the project root.
 npm run start
 
 # Run one grab by name
-npm run start log-workflow
+npm run start login-flow
 ```
 
 ### Inspecting Grabs
@@ -21,10 +21,6 @@ npm run help
 ```
 
 Lists grabs that have a `description` property.
-
-### Quiet CLI output
-
-Set `"verbose": 0` on a grab file to suppress internal engine output. The `log` action still prints. Ignored in server mode.
 
 ## Server Mode
 
@@ -37,8 +33,7 @@ Default port `3000`; override with `PORT` in `.env`.
 ### `POST /grab`
 
 - **Endpoint:** `POST http://localhost:3000/grab`
-- **Body:** Full grab JSON (`name`, `actions`, optional `description`, `verbose`)
-- **Rate limited** per IP
+- **Body:** Full grab JSON (`name`, `actions`, optional `description`)
 
 ```bash
 curl -X POST http://localhost:3000/grab \
@@ -55,10 +50,6 @@ curl -X POST http://localhost:3000/grab \
 ### Blocked actions in server runs
 
 `POST /grab` runs set `brain.run.payloadId`. Actions registered with `{ serverBlocked: true }` throw `ActionError` and return HTTP 500.
-
-Blocked: `userInput`, `log`, `screenshot`, `screenshotElement`, `login`, `setCurrentDir`, `backToParentDir`, `createDir`, `deleteFolder`, `deleteFile`, `listFolders`, `createFile`, `readFromText`, `saveToText`, `appendToText`, `fileExists`, `checkStringInFile`, `download`.
-
-Still allowed: browser/interaction actions, variables, control flow, and utilities such as `sleep`, `random`, `matchFromSelector`. The engine still calls `setBaseDir` and `resetCurrentDir` internally on every run.
 
 ### Responses
 
