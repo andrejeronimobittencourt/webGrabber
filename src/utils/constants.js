@@ -1,5 +1,1 @@
-export default {
-	inputKey: 'INPUT',
-	indentStep: 2,
-	grabberPrefix: 'GRABBER_',
-}
+export { default } from '../../packages/core/utils/constants.js'

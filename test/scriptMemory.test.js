@@ -1,6 +1,6 @@
 import test from 'node:test'
 import assert from 'node:assert'
-import ScriptMemory from '../src/core/brain/ScriptMemory.js'
+import ScriptMemory from '../packages/core/brain/ScriptMemory.js'
 import constants from '../src/utils/constants.js'
 
 test('ScriptMemory clones objects on learn', () => {

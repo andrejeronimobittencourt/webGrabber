@@ -12,6 +12,7 @@
     "start": "node app.js",
     "help": "node app.js --help",
     "start:server": "node app.js --server",
+    "start:agent": "node app.js --agent",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"

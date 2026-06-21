@@ -29,4 +29,6 @@ features:
     details: Inject runtime environment variables dynamically with the <code v-pre>{{variable}}</code> syntax.
   - title: Headless Server Mode 
     details: Run on a lightweight HTTP server to execute HTTP `POST /grab` triggers on demand.
+  - title: Agent Mode (Ollama)
+    details: Run browser tasks from natural-language instructions with a local Ollama model.
 ---

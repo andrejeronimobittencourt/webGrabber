@@ -5,7 +5,11 @@
 		"target": "ES2020",
 		"jsx": "react",
 		"strictNullChecks": true,
-		"strictFunctionTypes": true
+		"strictFunctionTypes": true,
+		"paths": {
+			"@webgrabber/core": ["./packages/core/index.js"],
+			"@webgrabber/core/*": ["./packages/core/*"]
+		}
 	},
 	"exclude": [
 		"node_modules",

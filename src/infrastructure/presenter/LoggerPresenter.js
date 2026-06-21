@@ -1,4 +1,4 @@
-import PresenterBase from './PresenterBase.js'
+import PresenterBase from '../../../packages/core/infrastructure/presenter/PresenterBase.js'
 import logger from '../../utils/logger.js'
 
 /**
@@ -6,8 +6,8 @@ import logger from '../../utils/logger.js'
  */
 export default class LoggerPresenter extends PresenterBase {
 	/**
-	 * @param {import('./PresenterBase.js').TextSegment[]} textData
-	 * @param {ReturnType<import('../../core/brain/BrainFactory.js').default['create']> | null} brain
+	 * @param {import('../../../packages/core/infrastructure/presenter/PresenterBase.js').TextSegment[]} textData
+	 * @param {ReturnType<import('../../../packages/core/brain/BrainFactory.js').default['create']> | null} brain
 	 */
 	write(textData, brain) {
 		const segments = this.prepareSegments(textData, brain)

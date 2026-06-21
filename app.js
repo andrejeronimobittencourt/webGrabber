@@ -2,6 +2,7 @@ import 'dotenv/config'
 import express from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import Grabber from './src/core/grabber/Grabber.js'
+import AgentRunner from './src/agent/AgentRunner.js'
 import CliPresenter from './src/infrastructure/presenter/CliPresenter.js'
 import LoggerPresenter from './src/infrastructure/presenter/LoggerPresenter.js'
 import { present, presentError, setPresenter, setServerMode } from './src/infrastructure/presenter/present.js'
@@ -9,13 +10,15 @@ import customize from './src/config/customActions.js'
 import puppeteerOptions from './src/config/puppeteerOptions.js'
 import rateLimiter from './src/middleware/rateLimiter.js'
 import { welcomePage } from './src/utils/welcomePage.js'
+import { parseCliArgs } from './src/utils/cliArgs.js'
 import logger from './src/utils/logger.js'
 
+const { agentMode, agentInstruction } = parseCliArgs()
 const isServerMode = process.argv.includes('--server')
 setServerMode(isServerMode)
 setPresenter(isServerMode ? new LoggerPresenter() : new CliPresenter())
 
-const startServerMode = async () => {
+const startServerMode = async (grabber) => {
 	const app = express()
 	app.use(express.json())
 
@@ -74,23 +77,37 @@ const startServerMode = async () => {
 	)
 }
 
-const grabber = new Grabber()
-customize(grabber)
+const runAgentMode = async () => {
+	if (!agentInstruction) {
+		throw new Error('Agent mode requires an instruction after --agent')
+	}
+
+	const runner = new AgentRunner()
+	await runner.init(puppeteerOptions)
+	await runner.run(agentInstruction)
+}
+
+const runGrabMode = async () => {
+	const grabber = new Grabber()
+	customize(grabber)
+
+	await grabber.init(puppeteerOptions)
+
+	if (isServerMode) {
+		await startServerMode(grabber)
+		return
+	}
+
+	await grabber.grab()
+}
 
 try {
-	await grabber.init(puppeteerOptions)
+	if (agentMode) {
+		await runAgentMode()
+	} else {
+		await runGrabMode()
+	}
 } catch (error) {
 	presentError(error)
 	process.exit(1)
-}
-
-if (isServerMode) {
-	await startServerMode()
-} else {
-	try {
-		await grabber.grab()
-	} catch (error) {
-		presentError(error)
-		process.exit(1)
-	}
 }

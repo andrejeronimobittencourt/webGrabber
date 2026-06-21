@@ -1,21 +1,15 @@
 import GrabListFactory from './GrabListFactory.js'
-import PuppeteerPageFactory from '../../infrastructure/PuppeteerPageFactory.js'
-import { ActionListContainer } from '../actions/ActionRegistry.js'
-import CoreActionList from '../actions/CoreActionList.js'
-import CustomActionList from '../actions/CustomActionList.js'
-import BrainFactory from '../brain/BrainFactory.js'
-import { present } from '../../infrastructure/presenter/present.js'
+import Engine from '../../../packages/core/Engine.js'
+import { present } from '../../../packages/core/infrastructure/presenter/present.js'
 import { loadGrabs } from '../../utils/loadGrabs.js'
 import { parseModeAndGrabName } from '../../utils/cliArgs.js'
-import constants from '../../utils/constants.js'
+import constants from '../../../packages/core/utils/constants.js'
 
 export default class Grabber {
-	#coreActionList
-	#customActionList
+	#engine
 
 	constructor() {
-		this.#coreActionList = new CoreActionList()
-		this.#customActionList = new CustomActionList()
+		this.#engine = new Engine()
 	}
 
 	/**
@@ -25,9 +19,7 @@ export default class Grabber {
 	 * @param {{ serverBlocked?: boolean }} [options]
 	 */
 	addCustomAction(name, action, options = {}) {
-		if (typeof action !== 'function') throw new Error(`Action ${name} must be a function`)
-		if (this.#coreActionList.has(name) || this.#customActionList.has(name)) throw new Error(`Action ${name} already exists`)
-		this.#customActionList.add(name, action, options)
+		this.#engine.addCustomAction(name, action, options)
 	}
 
 	/**
@@ -35,16 +27,7 @@ export default class Grabber {
 	 * @param {object} [puppeteerOptions={}]
 	 */
 	async init(puppeteerOptions = {}) {
-		const memories = new Map()
-		for (const [key, value] of Object.entries(process.env)) {
-			if (key.startsWith(constants.grabberPrefix)) memories.set(key.replace(constants.grabberPrefix, ''), value)
-		}
-
-		const actions = new ActionListContainer()
-		actions.add(this.#coreActionList)
-		actions.add(this.#customActionList)
-		BrainFactory.init(memories, actions)
-		await PuppeteerPageFactory.init(puppeteerOptions)
+		await this.#engine.init(puppeteerOptions)
 		present([{ text: 'Grabber initialized', color: 'green', style: 'bold' }])
 	}
 
@@ -62,7 +45,7 @@ export default class Grabber {
 	 */
 	async grab(payload = null) {
 		const { helpMode, grabName } = parseModeAndGrabName()
-		const brain = BrainFactory.create()
+		const brain = this.#engine.createBrain()
 
 		try {
 			const grabList = await this.#resolveGrabList(payload, grabName, brain)
@@ -70,17 +53,17 @@ export default class Grabber {
 			if (helpMode) {
 				this.#runHelpMode(grabList, grabName)
 			} else {
-				await this.#bootBrowser(brain)
+				await this.#engine.bootBrowser(brain)
 				await this.#runGrabActions(brain, grabList, grabName, payload)
 			}
 		} finally {
-			await this.#cleanup(brain)
+			await this.#engine.cleanup(brain)
 		}
 
 		present([{ text: 'Grabber finished', color: 'green', style: 'bold' }])
 
 		if (!payload) {
-			await PuppeteerPageFactory.close()
+			await this.#engine.close()
 			present([{ text: 'Grabber closed', color: 'green', style: 'bold' }])
 			return
 		}
@@ -117,13 +100,6 @@ export default class Grabber {
 		}
 	}
 
-	async #bootBrowser(brain) {
-		const defaultPage = await PuppeteerPageFactory.create()
-		const pages = { default: defaultPage }
-		brain.browser.pages = pages
-		brain.browser.activePage = defaultPage
-	}
-
 	async #runGrabActions(brain, grabList, grabName, payload) {
 		const asyncActions = []
 
@@ -149,15 +125,6 @@ export default class Grabber {
 		}
 
 		if (asyncActions.length > 0) await Promise.all(asyncActions)
-	}
-
-	async #cleanup(brain) {
-		const pages = brain.browser.pages
-		if (pages) {
-			for (const key in pages) {
-				await pages[key].close()
-			}
-		}
 	}
 
 	#buildResult(brain) {

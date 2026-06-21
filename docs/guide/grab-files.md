@@ -92,10 +92,8 @@ Some actions (like `getElements` or `matchFromSelector`) return a value at the e
 
 ## Script Memory & `INPUT`
 
-Grab scripts store user-defined variables via `setVariable`, `getVariable`, and related actions. These live in script memory and are accessed with `brain.learn()` / `brain.recall()` in custom actions, or via <code v-pre>{{variableName}}</code> interpolation in grab configs.
+Store values with `setVariable`, `getVariable`, and related actions. Reference them in later steps with <code v-pre>{{variableName}}</code>.
 
-- **`INPUT`**: The pipe variable. Actions that produce a result (e.g. `getElements`, `readFromText`) write their output here. It is overwritten each step — chain it immediately in the next action if you need the value.
+- **`INPUT`**: The pipe variable. Actions that return a result (e.g. `getElements`, `readFromText`) write their output here. It is overwritten each step — use it in the very next action if you need that value.
 
-Engine runtime state (browser tabs, filesystem paths, verbose level, action params) is **not** stored in script memory. It lives on namespaced brain properties (`brain.browser`, `brain.fs`, `brain.presenter`, `brain.run`) and is managed internally by the engine.
-
-Avoid using `INPUT` as a long-lived variable name in `setVariable` — reserve it for step-to-step piping.
+Avoid using `INPUT` as a long-lived variable name in `setVariable`; reserve it for step-to-step piping.

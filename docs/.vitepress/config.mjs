@@ -22,7 +22,8 @@ export default defineConfig({
         text: 'Core Concepts',
         items: [
           { text: 'Puppeteer Configuration', link: '/guide/puppeteer' },
-          { text: 'Server Mode', link: '/guide/server-mode' }
+          { text: 'Server Mode', link: '/guide/server-mode' },
+          { text: 'Agent Mode (Ollama)', link: '/guide/agent-mode' }
         ]
       },
       {

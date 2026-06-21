@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert'
 import GrabListFactory from '../src/core/grabber/GrabListFactory.js'
-import { ActionList, ActionListContainer } from '../src/core/actions/ActionRegistry.js'
+import { ActionList, ActionListContainer } from '../packages/core/actions/ActionRegistry.js'
 import CliPresenter from '../src/infrastructure/presenter/CliPresenter.js'
 import { createTestBrain } from './helpers/createTestBrain.js'
 import { setPresenter } from '../src/infrastructure/presenter/present.js'
@@ -39,7 +39,7 @@ test('ActionListContainer throws on unknown action', async () => {
 
 const grabberModule = await import('../src/core/grabber/Grabber.js').catch(() => null)
 const puppeteerModule = grabberModule
-	? await import('../src/infrastructure/PuppeteerPageFactory.js').catch(() => null)
+	? await import('../packages/core/infrastructure/PuppeteerPageFactory.js').catch(() => null)
 	: null
 
 test(

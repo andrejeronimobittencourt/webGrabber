@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert'
-import { ActionList } from '../src/core/actions/ActionRegistry.js'
+import { ActionList } from '../packages/core/actions/ActionRegistry.js'
+import logger from '../packages/core/utils/logger.js'
 import { createTestBrain } from './helpers/createTestBrain.js'
 
 test('ActionList allows serverBlocked action in CLI runs', async () => {
@@ -39,4 +40,40 @@ test('ActionList allows actions without serverBlocked flag in server runs', asyn
 	brain.run.payloadId = 'req-1'
 	await list.run('allowed', brain, null)
 	assert.strictEqual(ran, true)
+})
+
+test('ActionList logs validation failures as debug in agent mode', async () => {
+	const list = new ActionList()
+	list.add('getElements', async () => {})
+
+	const brain = createTestBrain()
+	brain.run.agentMode = true
+	brain.run.params = { selector: '' }
+
+	let errorCalled = false
+	let debugCalled = false
+	const originalError = logger.error.bind(logger)
+	const originalDebug = logger.debug.bind(logger)
+
+	logger.error = (...args) => {
+		errorCalled = true
+		return originalError(...args)
+	}
+	logger.debug = (...args) => {
+		debugCalled = true
+		return originalDebug(...args)
+	}
+
+	try {
+		await assert.rejects(
+			() => list.run('getElements', brain, null),
+			/Invalid parameters for action "getElements"/,
+		)
+	} finally {
+		logger.error = originalError
+		logger.debug = originalDebug
+	}
+
+	assert.strictEqual(errorCalled, false)
+	assert.strictEqual(debugCalled, true)
 })

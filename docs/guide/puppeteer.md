@@ -1,12 +1,22 @@
 # Puppeteer Configuration
 
-Since **webGrabber** entirely orchestrates the `puppeteer.launch()` mechanics for you, configuration takes place in a dedicated module file rather than hidden deep in standard CLI flags. 
+Browser launch settings live in `src/config/puppeteerOptions.js`.
 
-The configuration source of truth resides entirely in `src/config/puppeteerOptions.js`.
+## Headless vs headful
 
-## Structuring the Options payload
+By default Puppeteer launches Chrome **headless** (no visible window). To watch the browser in real time — useful when debugging grabs or [agent mode](./agent-mode.md) — set:
 
-The file exports a plain JavaScript object precisely mimicking the [Puppeteer LaunchOptions Object](https://pptr.dev/api/puppeteer.launchoptions).
+```javascript
+export default {
+  headless: false,
+}
+```
+
+When you omit a custom `viewport`, webGrabber defaults to `defaultViewport: null` so the page matches the window size in headful mode.
+
+## Launch options
+
+The file exports a plain object with [Puppeteer launch options](https://pptr.dev/api/puppeteer.launchoptions):
 
 ```javascript
 // src/config/puppeteerOptions.js
@@ -18,14 +28,12 @@ export default {
 }
 ```
 
-### Enabling Core Plugins
+### Stealth and ad blocking
 
-A primary reason webGrabber passes launch options this way instead of a flat JSON configuration is because you have the programmatic flexibility to enable stealth and ad-blockers dynamically.
+Add these optional top-level flags to the same file:
 
-Under the hood, webGrabber leverages `puppeteer-extra`. You can toggle two specific boolean keys at the top-level of the exported object:
-
-- `stealth`: When `true`, enables `puppeteer-extra-plugin-stealth` avoiding most bot detection logic like re-CAPTCHA.
-- `adblocker`: When `true`, enables `puppeteer-extra-plugin-adblocker` significantly reducing loading speed overhead and bandwidth.
+- `stealth`: When `true`, reduces common bot-detection signals.
+- `adblocker`: When `true`, blocks ads and trackers to speed up page loads.
 
 **Example for high-anon workflows:**
 

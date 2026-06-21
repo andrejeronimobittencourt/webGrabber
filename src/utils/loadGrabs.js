@@ -1,7 +1,7 @@
 import yaml from 'js-yaml'
 import StyledConsole from '../infrastructure/StyledConsole.js'
 import { FileSystem } from './FileSystem.js'
-import { grabSchema, formatGrabValidationError } from '../schemas/grabSchema.js'
+import { grabSchema, formatGrabValidationError } from '../../packages/core/schemas/grabSchema.js'
 import { pathJoin, rootPathJoin } from './paths.js'
 
 /**

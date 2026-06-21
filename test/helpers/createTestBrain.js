@@ -1,5 +1,5 @@
-import BrainFactory from '../../src/core/brain/BrainFactory.js'
-import { ActionListContainer } from '../../src/core/actions/ActionRegistry.js'
+import BrainFactory from '../../packages/core/brain/BrainFactory.js'
+import { ActionListContainer } from '../../packages/core/actions/ActionRegistry.js'
 
 /**
  * Create a Brain instance via BrainFactory for unit tests.

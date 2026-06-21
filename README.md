@@ -8,10 +8,14 @@
 
 Runs can execute totally locally offline via the CLI or act as a lightweight, rate-limited HTTP server `/grab` endpoint engine API.
 
+<p align="center">
+  <img src="assets/images/demo.gif" alt="webGrabber demo">
+</p>
+
 ---
 
 > [!TIP]
-> **🚀 For the complete API reference, Custom Action tutorials, and architecture guides, view our [Official Documentation Website](https://andrejeronimobittencourt.github.io/webGrabber/).**
+> **🚀 For the full guide, action reference, and custom-action tutorials, see the [documentation site](https://andrejeronimobittencourt.github.io/webGrabber/).**
 >
 > *If you've cloned the repository, you can boot the live interactive documentation locally by typing `npm run docs:dev`.*
 
@@ -44,7 +48,7 @@ npm run start hello-world
 For advanced HTTP trigger modes (`npm run start:server`) or dynamic memory mapping (`{{variable}}`), read the full reference inside `./docs/`.
 
 ## Contributing & Extensibility
-Extensibility sits at the absolute core of webGrabber. If you require advanced edge-case parsing or integrations beyond the generic library, see how simple it is to inject vanilla JS logic blocks using the [`src/config/customActions.js`](./docs/guide/custom-actions.md) hooks engine.
+Extensibility sits at the core of webGrabber. For custom logic, see [Building Custom Actions](./docs/guide/custom-actions.md).
 
 Please refer to the [CODE_OF_CONDUCT](./CODE_OF_CONDUCT.md) prior to submitting issues or pull request patches.
 

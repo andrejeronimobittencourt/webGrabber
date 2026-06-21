@@ -25,7 +25,7 @@ test('pathJoin joins paths', () => {
 })
 
 test('basePathJoin joins with utils directory', () => {
-	const utilsPath = path.dirname(fileURLToPath(new URL('../src/utils/paths.js', import.meta.url)))
+	const utilsPath = path.dirname(fileURLToPath(new URL('../packages/core/utils/paths.js', import.meta.url)))
 	const result = basePathJoin('folder')
 	assert.strictEqual(result, path.join(utilsPath, 'folder'))
 })

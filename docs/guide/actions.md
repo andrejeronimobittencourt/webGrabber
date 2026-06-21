@@ -1,6 +1,6 @@
 # Built-in Actions Reference
 
-**webGrabber** provides built-in actions for scraping and automation workflows. Parameter types below match the runtime Zod schemas.
+**webGrabber** provides built-in actions for scraping and automation workflows. Parameters marked *(opt)* are optional.
 
 Actions marked **server: no** cannot be used in `POST /grab` payloads (inline server runs). See [Server Mode](./server-mode.md#blocked-actions-in-server-runs).
 
@@ -26,6 +26,7 @@ Actions marked **server: no** cannot be used in `POST /grab` payloads (inline se
 | Action | Parameters | Description |
 |--------|------------|-------------|
 | `type` | `selector` *(str)*, `text` *(str)*, `secret` *(bool, opt)* | Type into an input. Masks logs when `secret` is true. |
+| `pressKey` | `key` *(str)*, `selector` *(str, opt)* | Press a keyboard key. Optional `selector` focuses an input first. |
 | `click` | `selector` *(str)*, `text` *(str, opt)*, `attribute` *(str, opt)* | Click a matching element. Optional `text` fuzzy match. |
 | `clickAll` | `selector` *(str)* | Click all elements matching the selector. |
 | `login` **server: no** | `url`, `usernameSelector`, `username`, `passwordSelector`, `password`, `submitSelector`, `cookieName` *(str, opt)* | Full login flow with optional cookie reuse via `cookieName`. |

@@ -1,6 +1,6 @@
 # Installation & Troubleshooting
 
-**webGrabber** is powered by Node.js and heavily relies on [Puppeteer](https://pptr.dev/) under the hood to perform browser automation. Follow the steps below to integrate it seamlessly into your environment or run it securely via CLI.
+**webGrabber** runs on Node.js and uses [Puppeteer](https://pptr.dev/) for browser automation. Follow the steps below to install it and fix common setup issues.
 
 ## Prerequisites
 
@@ -18,7 +18,7 @@ cd webGrabber
 npm install
 ```
 
-When you install webGrabber, npm will automatically fetch the core dependencies including Puppeteer, Express, and essential Puppeteer stealth plugins.
+When you install webGrabber, npm fetches Puppeteer, Express, and other dependencies automatically.
 
 ## Troubleshooting Puppeteer
 

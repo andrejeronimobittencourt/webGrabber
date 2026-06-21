@@ -49,24 +49,16 @@ curl -X POST http://localhost:3000/grab \
 
 ### Blocked actions in server runs
 
-`POST /grab` runs set `brain.run.payloadId`. Actions registered with `{ serverBlocked: true }` throw `ActionError` and return HTTP 500.
+Some actions cannot run over HTTP (filesystem prompts, screenshots, login cookies, etc.). They are marked **server: no** in the [actions reference](./actions.md). Using one in a `POST /grab` payload returns HTTP 500.
 
 ### Responses
 
-**Success (`200`):** returns the final `INPUT` pipe value wrapped in `result`:
+**Success (`200`):** JSON body with the last action’s return value:
 
 ```json
 {
-  "result": "value from last action that wrote INPUT"
+  "result": "value from the final step"
 }
 ```
 
-If nothing wrote `INPUT`, `result` is `undefined`/absent depending on the last step.
-
-**Failure (`500`):** plain text body:
-
-```
-Internal Server Error
-```
-
-Structured error JSON, request IDs in the response body, and duration metadata are not returned to the client today. Failures are logged server-side via Winston.
+**Failure (`500`):** plain text `Internal Server Error`. Check the server logs for details.

@@ -6,8 +6,8 @@ import logger from '../utils/logger.js'
  * Configurable via environment variables
  */
 export default rateLimit({
-	windowMs: parseInt(process.env.GRABBER_RATE_LIMIT_WINDOW_MS || 900000), // 15 minutes
-	max: parseInt(process.env.GRABBER_RATE_LIMIT_MAX_REQUESTS || 100), // 100 requests per window
+	windowMs: parseInt(process.env.SERVER_RATE_LIMIT_WINDOW_MS || 900000), // 15 minutes
+	max: parseInt(process.env.SERVER_RATE_LIMIT_MAX_REQUESTS || 100), // 100 requests per window
 	standardHeaders: true, // Return rate limit info in RateLimit-* headers
 	legacyHeaders: false, // Disable X-RateLimit-* headers
 	handler: (req, res) => {
