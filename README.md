@@ -6,8 +6,6 @@
 
 **webGrabber** is a heavily robust, config-based web scraper and browser automation tool built squarely on top of [Puppeteer](https://pptr.dev/). It allows you to describe scraping or automation tasks organically via cleanly structured, highly readable declarative **JSON** or **YAML** files ("Grabs") and sequentially pipe the runtime memory variables flawlessly between executed actions.
 
-Runs can execute totally locally offline via the CLI or act as a lightweight, rate-limited HTTP server `/grab` endpoint engine API.
-
 <p align="center">
   <img src="assets/images/demo.gif" alt="webGrabber demo">
 </p>
