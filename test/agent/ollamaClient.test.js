@@ -64,3 +64,28 @@ test('OllamaClient chat omits reasoning_effort when thinking is disabled', async
 		globalThis.fetch = previousFetch
 	}
 })
+
+test('OllamaClient chat reports a clear error when Ollama is unreachable', async () => {
+	const previousFetch = globalThis.fetch
+
+	globalThis.fetch = async () => {
+		const error = new TypeError('fetch failed')
+		error.code = 'ECONNREFUSED'
+		throw error
+	}
+
+	try {
+		const client = new OllamaClient({
+			baseUrl: 'http://localhost:11434/v1',
+			reasonModel: 'gemma4:latest',
+			reasoningEffort: null,
+		})
+
+		await assert.rejects(
+			() => client.chat([{ role: 'user', content: 'Hello' }], []),
+			/Ollama is unreachable at http:\/\/localhost:11434\/v1/,
+		)
+	} finally {
+		globalThis.fetch = previousFetch
+	}
+})

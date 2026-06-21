@@ -9,6 +9,32 @@
 import { resolveReasonModel, resolveReasoningEffort, resolveVisionModel } from './agentModels.js'
 
 /**
+ * @param {string} baseUrl
+ * @param {unknown} error
+ * @returns {Error}
+ */
+function createOllamaConnectionError(baseUrl, error) {
+	let detail = 'connection failed — is Ollama running?'
+
+	if (error instanceof Error) {
+		const code = 'code' in error && typeof error.code === 'string' ? error.code : null
+
+		if (code === 'ECONNREFUSED') {
+			detail = 'connection refused — is Ollama running?'
+		} else if (code === 'ENOTFOUND') {
+			detail = 'host not found — check AGENT_OLLAMA_URL'
+		} else if (error.message !== 'fetch failed') {
+			detail = error.message
+		}
+	}
+
+	return new Error(
+		`Ollama is unreachable at ${baseUrl}. ${detail} ` +
+			'Set AGENT_OLLAMA_URL if Ollama uses a different host or port.',
+	)
+}
+
+/**
  * Local Ollama client using the OpenAI-compatible chat completions API.
  */
 export default class OllamaClient {
@@ -128,6 +154,8 @@ export default class OllamaClient {
 			method: 'POST',
 			headers: { 'Content-Type': 'application/json' },
 			body: JSON.stringify(body),
+		}).catch((error) => {
+			throw createOllamaConnectionError(this.#baseUrl, error)
 		})
 
 		if (!response.ok) {

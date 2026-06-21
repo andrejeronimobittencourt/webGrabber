@@ -3,6 +3,7 @@ import express from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import Grabber from './src/core/grabber/Grabber.js'
 import AgentRunner from './src/agent/AgentRunner.js'
+import { validateAgentCliOptions } from './src/agent/agentCli.js'
 import Engine from './packages/core/Engine.js'
 import CliPresenter from './src/infrastructure/presenter/CliPresenter.js'
 import LoggerPresenter from './src/infrastructure/presenter/LoggerPresenter.js'
@@ -14,10 +15,17 @@ import { welcomePage } from './src/utils/welcomePage.js'
 import { parseCliArgs } from './src/utils/cliArgs.js'
 import logger from './src/utils/logger.js'
 
-const { agentMode, agentInstruction } = parseCliArgs()
-const isServerMode = process.argv.includes('--server')
-setServerMode(isServerMode)
-setPresenter(isServerMode ? new LoggerPresenter() : new CliPresenter())
+const cliArgs = parseCliArgs()
+const {
+	agentMode,
+	agentInstruction,
+	agentExportName,
+	agentExportOverwrite,
+	serverMode,
+} = cliArgs
+
+setServerMode(serverMode)
+setPresenter(serverMode ? new LoggerPresenter() : new CliPresenter())
 
 const startServerMode = async (grabber) => {
 	const app = express()
@@ -79,15 +87,14 @@ const startServerMode = async (grabber) => {
 }
 
 const runAgentMode = async () => {
-	if (!agentInstruction) {
-		throw new Error('Agent mode requires an instruction after --agent')
-	}
-
 	const engine = new Engine()
 	customize(engine)
 	const runner = new AgentRunner({ engine })
 	await runner.init(puppeteerOptions)
-	await runner.run(agentInstruction)
+	await runner.run(agentInstruction, {
+		exportGrabName: agentExportName,
+		exportOverwrite: agentExportOverwrite,
+	})
 }
 
 const runGrabMode = async () => {
@@ -96,7 +103,7 @@ const runGrabMode = async () => {
 
 	await grabber.init(puppeteerOptions)
 
-	if (isServerMode) {
+	if (serverMode) {
 		await startServerMode(grabber)
 		return
 	}
@@ -105,6 +112,8 @@ const runGrabMode = async () => {
 }
 
 try {
+	validateAgentCliOptions(cliArgs)
+
 	if (agentMode) {
 		await runAgentMode()
 	} else {

@@ -29,13 +29,27 @@ Puppeteer runs headless by default unless you change it. To watch the agent work
 npm run start:agent "Go to https://example.com and return the h1 text"
 ```
 
-Or pass the flag explicitly:
+Write instructions as you would ask a person: where to go, what to search or click, and exactly what to return (for example “return the price text”, not “find the price”).
+
+### Export a grab from a run
 
 ```bash
-npm run start -- --agent "Go to https://example.com and return the h1 text"
+npm run start:agent:export example-h1 "Go to https://example.com and return the h1 text"
 ```
 
-Write instructions as you would ask a person: where to go, what to search or click, and exactly what to return (for example “return the price text”, not “find the price”).
+Grab name first, then the instruction in quotes. The file is written to `grabs/<grab-name>.json` with your instruction as `description`.
+
+To replace an existing grab:
+
+```bash
+npm run start:agent:export:overwrite example-h1 "Go to https://example.com and return the h1 text"
+```
+
+Replay it:
+
+```bash
+npm run start example-h1
+```
 
 ## Configuration
 
@@ -49,7 +63,7 @@ Agent settings use the `AGENT_*` prefix.
 | `AGENT_VISION` | `false` | Set to `true` to analyze page screenshots (helpful on complex layouts) |
 | `AGENT_ALLOWED_HOSTS` | empty | Comma-separated host allowlist for navigation; empty allows all hosts |
 | `AGENT_MAX_STEPS` | `30` | Maximum steps before the run stops |
-| `AGENT_CACHE_OBSERVATIONS` | `true` | Skip redundant page scans when the page has not changed |
+| `AGENT_CACHE_OBSERVATIONS` | `true` | Cache page observations between steps |
 | `AGENT_REASON_THINKING` | `false` | Enable extended reasoning on supported models |
 | `AGENT_REASONING_EFFORT` | `medium` | Reasoning depth when thinking is enabled: `high`, `medium`, `low`, or `max` |
 
@@ -84,7 +98,7 @@ AGENT_ALLOWED_HOSTS=example.com npm run start:agent "Summarize example.com"
 | Best for exploration and ad-hoc tasks | Best for CI, cron jobs, and replay |
 | Depends on your local Ollama model | Deterministic and fast |
 
-When an agent run works well, you can turn the step log into a grab and run it with the normal CLI (`npm run start <grab-name>`).
+When an agent run works well, export it with `npm run start:agent:export` or build a grab manually and run it with `npm run start <grab-name>`.
 
 ## Importable grab tools
 

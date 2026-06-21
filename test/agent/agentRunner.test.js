@@ -53,6 +53,34 @@ class MockPage {
 	}
 
 	async evaluate(_fn, args) {
+		if (args && args.collectionMode === 'tags') {
+			return {
+				elements: [
+					{
+						index: 0,
+						selector: 'h1',
+						tag: 'h1',
+						text: 'Example Domain',
+						href: null,
+						type: null,
+						name: null,
+						id: null,
+					},
+					{
+						index: 1,
+						selector: 'p',
+						tag: 'p',
+						text: 'More information...',
+						href: null,
+						type: null,
+						name: null,
+						id: null,
+					},
+				],
+				total: 2,
+			}
+		}
+
 		if (args && typeof args.elementOffset === 'number') {
 			const total = 150
 			const element = {
@@ -110,7 +138,7 @@ class MockPage {
 	}
 }
 
-function createMockEngine() {
+function createMockEngine(options = {}) {
 	const page = new MockPage()
 
 	return {
@@ -133,7 +161,7 @@ function createMockEngine() {
 		async cleanup() {},
 		async close() {},
 		async perform(brain, name, page) {
-			if (name === 'getElements') {
+			if (name === 'getElements' && options.failGetElements) {
 				throw new Error('Tool execution failed')
 			}
 			await brain.perform(name, page)
@@ -163,6 +191,21 @@ test('AgentRunner returns final answer after tool execution', async () => {
 							id: 'call-1',
 							type: 'function',
 							function: {
+								name: 'pickElement',
+								arguments: JSON.stringify({ selector: '#item-0' }),
+							},
+						},
+					],
+				},
+			},
+			{
+				message: {
+					role: 'assistant',
+					tool_calls: [
+						{
+							id: 'call-2',
+							type: 'function',
+							function: {
 								name: 'getElements',
 								arguments: JSON.stringify({ selector: '#item-0' }),
 							},
@@ -182,8 +225,9 @@ test('AgentRunner returns final answer after tool execution', async () => {
 	const result = await runner.run('Get the h1 text')
 
 	assert.strictEqual(result.answer, 'The h1 text is extracted-value.')
-	assert.strictEqual(result.steps.length, 1)
-	assert.strictEqual(result.steps[0].action, 'getElements')
+	assert.strictEqual(result.steps.length, 2)
+	assert.strictEqual(result.steps[0].action, 'pickElement')
+	assert.strictEqual(result.steps[1].action, 'getElements')
 	assert.strictEqual(result.memory.input, 'extracted-value')
 })
 
@@ -197,6 +241,7 @@ test('AgentRunner rejects empty instruction', async () => {
 
 test('AgentRunner feeds tool errors back to the model and continues', async () => {
 	const runner = new AgentRunner(createRunnerOptions({
+		engine: createMockEngine({ failGetElements: true }),
 		policy: new AgentPolicy({ maxSteps: 5 }),
 		client: new MockOllamaClient([
 			{
@@ -205,6 +250,21 @@ test('AgentRunner feeds tool errors back to the model and continues', async () =
 					tool_calls: [
 						{
 							id: 'call-1',
+							type: 'function',
+							function: {
+								name: 'pickElement',
+								arguments: JSON.stringify({ selector: '#item-0' }),
+							},
+						},
+					],
+				},
+			},
+			{
+				message: {
+					role: 'assistant',
+					tool_calls: [
+						{
+							id: 'call-2',
 							type: 'function',
 							function: {
 								name: 'getElements',
@@ -226,9 +286,9 @@ test('AgentRunner feeds tool errors back to the model and continues', async () =
 	const result = await runner.run('Try and recover')
 
 	assert.strictEqual(result.answer, 'Recovered after the failed tool.')
-	assert.strictEqual(result.steps.length, 1)
-	assert.strictEqual(result.steps[0].error, 'Tool execution failed')
-	assert.deepStrictEqual(result.steps[0].result, { error: 'Tool execution failed' })
+	assert.strictEqual(result.steps.length, 2)
+	assert.strictEqual(result.steps[1].error, 'Tool execution failed')
+	assert.deepStrictEqual(result.steps[1].result, { error: 'Tool execution failed' })
 })
 
 test('AgentRunner feeds cheatsheet validation errors back to the model and continues', async () => {
@@ -477,6 +537,21 @@ test('AgentRunner skips page vision before first navigate', async () => {
 			{
 				message: {
 					role: 'assistant',
+					tool_calls: [
+						{
+							id: 'call-2',
+							type: 'function',
+							function: {
+								name: 'pickElement',
+								arguments: JSON.stringify({ selector: 'h1' }),
+							},
+						},
+					],
+				},
+			},
+			{
+				message: {
+					role: 'assistant',
 					content: 'Navigation complete.',
 				},
 			},
@@ -562,4 +637,93 @@ test('AgentRunner executes listElements as an agent-native tool', async () => {
 			process.env.AGENT_VISION = previousVision
 		}
 	}
+})
+
+test('AgentRunner requires pickElement before answering from visible text', async () => {
+	const engine = createMockEngine()
+	engine.perform = async (brain, name) => {
+		if (name === 'getElements') {
+			brain.recall = () => 'Example Domain'
+		}
+	}
+
+	const runner = new AgentRunner(createRunnerOptions({
+		engine,
+		policy: new AgentPolicy({ maxSteps: 8 }),
+		client: new MockOllamaClient([
+			{
+				message: {
+					role: 'assistant',
+					tool_calls: [
+						{
+							id: 'call-1',
+							type: 'function',
+							function: {
+								name: 'navigate',
+								arguments: JSON.stringify({ url: 'https://example.com' }),
+							},
+						},
+					],
+				},
+			},
+			{
+				message: {
+					role: 'assistant',
+					tool_calls: [
+						{
+							id: 'call-2',
+							type: 'function',
+							function: {
+								name: 'getElements',
+								arguments: JSON.stringify({ selector: 'h1' }),
+							},
+						},
+					],
+				},
+			},
+			{
+				message: {
+					role: 'assistant',
+					tool_calls: [
+						{
+							id: 'call-3',
+							type: 'function',
+							function: {
+								name: 'pickElement',
+								arguments: JSON.stringify({ selector: 'h1' }),
+							},
+						},
+					],
+				},
+			},
+			{
+				message: {
+					role: 'assistant',
+					tool_calls: [
+						{
+							id: 'call-4',
+							type: 'function',
+							function: {
+								name: 'getElements',
+								arguments: JSON.stringify({ selector: 'h1' }),
+							},
+						},
+					],
+				},
+			},
+			{
+				message: {
+					role: 'assistant',
+					content: 'Example Domain',
+				},
+			},
+		]),
+	}))
+
+	const result = await runner.run('Return the h1 text')
+
+	assert.strictEqual(result.answer, 'Example Domain')
+	assert.match(result.steps[1].error ?? '', /pickElement/)
+	assert.strictEqual(result.steps[2].action, 'pickElement')
+	assert.strictEqual(result.steps[3].action, 'getElements')
 })

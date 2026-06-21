@@ -9,3 +9,5 @@ logs/
 *.log
 docs/.vitepress/cache
 docs/.vitepress/dist
+.cursor
+.vscode

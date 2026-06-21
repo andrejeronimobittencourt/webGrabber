@@ -13,6 +13,8 @@
     "help": "node app.js --help",
     "start:server": "node app.js --server",
     "start:agent": "node app.js --agent",
+    "start:agent:export": "node app.js --agent --export",
+    "start:agent:export:overwrite": "node app.js --agent --export --overwrite",
     "docs:dev": "vitepress dev docs",
     "docs:build": "vitepress build docs",
     "docs:preview": "vitepress preview docs"

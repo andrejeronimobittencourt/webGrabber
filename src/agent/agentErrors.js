@@ -38,4 +38,25 @@ export class AgentValidationError extends Error {
 			`Selector "${selector}" is not in the current element list. ${hint}`,
 		)
 	}
+
+	/**
+	 * @param {string} hint
+	 * @returns {AgentValidationError}
+	 */
+	static pickRequired(hint) {
+		return new AgentValidationError('Pick an element before continuing', hint)
+	}
+
+	/**
+	 * @param {string} selector
+	 * @param {string} pickedSelector
+	 * @param {string} hint
+	 * @returns {AgentValidationError}
+	 */
+	static pickMismatch(selector, pickedSelector, hint) {
+		return new AgentValidationError(
+			'Selector does not match the current pick',
+			`Selector "${selector}" does not match the current pick "${pickedSelector}". ${hint}`,
+		)
+	}
 }

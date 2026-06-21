@@ -7,7 +7,8 @@ test('AgentPolicy allows curated actions', () => {
 	assert.strictEqual(policy.isAllowedAction('navigate'), true)
 	assert.strictEqual(policy.isAllowedAction('click'), true)
 	assert.strictEqual(policy.isAllowedAction('listElements'), true)
-	assert.strictEqual(policy.isAllowedAction('listVisibleElements'), true)
+	assert.strictEqual(policy.isAllowedAction('paginateVisibleElements'), true)
+	assert.strictEqual(policy.isAllowedAction('pickElement'), true)
 	assert.strictEqual(policy.isAllowedAction('inspectElement'), true)
 	assert.strictEqual(policy.isAllowedAction('listTabs'), true)
 	assert.strictEqual(policy.isAllowedAction('switchTab'), true)
@@ -99,6 +100,7 @@ test('AgentPolicy allows selectors from the cheatsheet', () => {
 	assert.doesNotThrow(() =>
 		policy.validateAction('type', { selector: 'textarea[name="q"]', text: 'test' }, {
 			knownSelectors,
+			pickedSelector: 'textarea[name="q"]',
 		}),
 	)
 })
@@ -116,12 +118,32 @@ test('AgentPolicy rejects getElements selectors outside known element lists', ()
 	)
 })
 
-test('AgentPolicy allows getElements selectors from listVisibleElements', () => {
+test('AgentPolicy requires pickElement before selector actions', () => {
+	const policy = new AgentPolicy()
+	const knownSelectors = new Set(['p.result'])
+
+	assert.throws(
+		() =>
+			policy.validateAction('getElements', { selector: 'p.result' }, {
+				knownSelectors,
+			}),
+		/pickElement/,
+	)
+
+	assert.doesNotThrow(() =>
+		policy.validateAction('getElements', { selector: 'p.result' }, {
+			knownSelectors,
+			pickedSelector: 'p.result',
+		}),
+	)
+})
+
+test('AgentPolicy allows pickElement selectors from the observation', () => {
 	const policy = new AgentPolicy()
 	const knownSelectors = new Set(['p.result'])
 
 	assert.doesNotThrow(() =>
-		policy.validateAction('getElements', { selector: 'p.result' }, {
+		policy.validateAction('pickElement', { selector: 'p.result' }, {
 			knownSelectors,
 		}),
 	)

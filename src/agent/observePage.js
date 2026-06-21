@@ -8,7 +8,10 @@ import {
 	computePageFingerprint,
 } from './AgentObservationCache.js'
 import { listAgentTabs } from './agentTabs.js'
-import { normalizeProbeTags } from './visibleElementProbe.js'
+import {
+	createDefaultVisibleElementListState,
+	resolveVisibleElementListState,
+} from './visibleElementProbe.js'
 
 /** URLs where viewport vision is skipped until the agent navigates. */
 const PRE_NAVIGATE_PAGE_URLS = new Set(['about:blank', 'chrome://newtab/'])
@@ -72,6 +75,9 @@ export function shouldIncludePageScreenshot(page, hasNavigated = false) {
  * @property {string} title
  * @property {PageElementSnapshot[]} elements
  * @property {ElementsPageMeta} elementsPage
+ * @property {PageElementSnapshot[]} visibleElements
+ * @property {ElementsPageMeta} visibleElementsPage
+ * @property {string | null} pickedSelector
  * @property {*} lastResult
  * @property {string} [screenshot]
  * @property {string} [visualSummary]
@@ -244,21 +250,41 @@ export async function listElements(page, params = {}) {
 /**
  * @param {import('puppeteer').Page} page
  * @param {{ tags: string[], offset?: number, limit?: number }} params
- * @returns {Promise<{ tags: string[], elements: PageElementSnapshot[], elementsPage: ElementsPageMeta }>}
+ * @returns {Promise<{ tags: string[], offset: number, elements: PageElementSnapshot[], elementsPage: ElementsPageMeta }>}
  */
-export async function listVisibleElements(page, params) {
-	const tags = normalizeProbeTags(params.tags)
+export async function paginateVisibleElements(page, params) {
+	const state = resolveVisibleElementListState(createDefaultVisibleElementListState(), params)
 	const limit = params.limit ?? resolveElementPageSize()
-	const offset = resolveElementOffset(params.offset)
-
+	const offset = resolveElementOffset(state.offset)
 	const { elements, elementsPage } = await collectVisibleElements(page, {
 		mode: 'tags',
-		tags,
+		tags: state.tags,
 		offset,
 		limit,
 	})
 
-	return { tags, elements, elementsPage }
+	return {
+		tags: state.tags,
+		offset,
+		elements,
+		elementsPage,
+	}
+}
+
+/**
+ * @param {import('puppeteer').Page} page
+ * @param {{ tags: string[], offset?: number, limit?: number }} params
+ * @returns {Promise<{ tags: string[], elements: PageElementSnapshot[], elementsPage: ElementsPageMeta }>}
+ * @deprecated Use paginateVisibleElements instead.
+ */
+export async function listVisibleElements(page, params) {
+	const result = await paginateVisibleElements(page, params)
+
+	return {
+		tags: result.tags,
+		elements: result.elements,
+		elementsPage: result.elementsPage,
+	}
 }
 
 /**
@@ -340,6 +366,7 @@ export async function inspectElement(page, client, params) {
  * @property {AgentObservationCache} [cache]
  * @property {boolean} [cacheEnabled]
  * @property {ReturnType<import('../../packages/core/brain/BrainFactory.js').default['create']>} [brain]
+ * @property {import('./visibleElementProbe.js').VisibleElementListState} [visibleElementList]
  */
 
 /**
@@ -376,12 +403,24 @@ export async function observePage(page, brain, options = {}) {
 		}
 	}
 
+	const visibleElementList = options.visibleElementList ?? createDefaultVisibleElementListState()
+	const { elements: visibleElements, elementsPage: visibleElementsPage } =
+		await collectVisibleElements(page, {
+			mode: 'tags',
+			tags: visibleElementList.tags,
+			offset: visibleElementList.offset,
+			limit: pageSize,
+		})
+
 	/** @type {PageObservation} */
 	const observation = {
 		url: page.url(),
 		title: await page.title(),
 		elements,
 		elementsPage,
+		visibleElements,
+		visibleElementsPage,
+		pickedSelector: options.brain?.run?.pickedSelector ?? null,
 		lastResult: brain.recall(constants.inputKey),
 		tabs: await listAgentTabs(brain),
 	}

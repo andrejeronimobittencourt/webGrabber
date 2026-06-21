@@ -1,6 +1,5 @@
-/** @typedef {import('../../packages/core/brain/BrainFactory.js').default} BrainFactory */
-
 import { CHEATSHEET_SELECTOR_REJECTION_HINT } from './agentCheatsheet.js'
+import { PICK_ELEMENT_HINT } from './agentPick.js'
 import { AgentValidationError } from './agentErrors.js'
 import { validateGrabParameters } from '../../packages/core/grabParameters.js'
 import { BUILTIN_AGENT_TOOL_NAMES } from '../../packages/core/utils/builtinAgentToolNames.js'
@@ -15,6 +14,7 @@ const KNOWN_SELECTOR_ACTIONS = new Set([
 	'inspectElement',
 	'pressKey',
 	'getElements',
+	'pickElement',
 ])
 
 /**
@@ -59,7 +59,7 @@ export default class AgentPolicy {
 	/**
 	 * @param {string} name
 	 * @param {Record<string, unknown>} params
-	 * @param {{ currentUrl?: string, knownSelectors?: Set<string> }} [context]
+	 * @param {{ currentUrl?: string, knownSelectors?: Set<string>, pickedSelector?: string | null }} [context]
 	 */
 	validateAction(name, params, context = {}) {
 		const dynamicEntry = this.#dynamicRegistry.get(name)
@@ -81,8 +81,33 @@ export default class AgentPolicy {
 			throw new Error('switchTab requires a tabKey string')
 		}
 
+		if (name === 'pickElement' && typeof params.selector === 'string') {
+			this.validateCheatsheetSelector(params.selector, context.knownSelectors)
+			return
+		}
+
 		if (KNOWN_SELECTOR_ACTIONS.has(name) && typeof params.selector === 'string') {
 			this.validateCheatsheetSelector(params.selector, context.knownSelectors)
+			this.validatePickedSelector(name, params.selector, context.pickedSelector)
+		}
+	}
+
+	/**
+	 * @param {string} actionName
+	 * @param {string} selector
+	 * @param {string | null | undefined} pickedSelector
+	 */
+	validatePickedSelector(actionName, selector, pickedSelector) {
+		if (actionName === 'pickElement') {
+			return
+		}
+
+		if (!pickedSelector) {
+			throw AgentValidationError.pickRequired(PICK_ELEMENT_HINT)
+		}
+
+		if (selector !== pickedSelector) {
+			throw AgentValidationError.pickMismatch(selector, pickedSelector, PICK_ELEMENT_HINT)
 		}
 	}
 

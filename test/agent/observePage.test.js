@@ -5,8 +5,8 @@ import {
 	collectInteractiveElements,
 	isAgentPreNavigatePageUrl,
 	listElements,
-	listVisibleElements,
 	observePage,
+	paginateVisibleElements,
 	shouldIncludePageScreenshot,
 } from '../../src/agent/observePage.js'
 
@@ -73,7 +73,7 @@ test('collectInteractiveElements returns paginated elements with selectors', asy
 	assert.strictEqual(result.elementsPage.hasMore, true)
 })
 
-test('listVisibleElements returns visible readable elements for requested tags', async () => {
+test('paginateVisibleElements returns visible readable elements for requested tags', async () => {
 	const page = {
 		async evaluate(_fn, { collectionMode, probeTags, elementOffset, elementLimit }) {
 			assert.strictEqual(collectionMode, 'tags')
@@ -109,7 +109,7 @@ test('listVisibleElements returns visible readable elements for requested tags',
 		},
 	}
 
-	const result = await listVisibleElements(page, { tags: ['p', 'h1'], offset: 0 })
+	const result = await paginateVisibleElements(page, { tags: ['p', 'h1'], offset: 0 })
 
 	assert.deepStrictEqual(result.tags, ['p', 'h1'])
 	assert.strictEqual(result.elements.length, 2)
@@ -138,7 +138,7 @@ test('listElements rejects a negative offset', async () => {
 	await assert.rejects(() => listElements(page, { offset: -1 }), /non-negative integer/)
 })
 
-test('listVisibleElements defaults offset to 0', async () => {
+test('paginateVisibleElements defaults offset to 0', async () => {
 	const page = {
 		async evaluate(_fn, { elementOffset }) {
 			assert.strictEqual(elementOffset, 0)
@@ -147,7 +147,7 @@ test('listVisibleElements defaults offset to 0', async () => {
 		},
 	}
 
-	const result = await listVisibleElements(page, { tags: ['p'] })
+	const result = await paginateVisibleElements(page, { tags: ['p'] })
 
 	assert.deepStrictEqual(result.tags, ['p'])
 	assert.strictEqual(result.elements.length, 0)

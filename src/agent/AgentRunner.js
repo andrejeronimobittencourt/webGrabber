@@ -19,14 +19,15 @@ import {
 } from './agentDynamicTools.js'
 import { runDynamicAgentTool } from './runAgentDynamicTool.js'
 import { loadGrabCatalog } from '../utils/loadGrabs.js'
+import { createDefaultVisibleElementListState, resolveVisibleElementListState } from './visibleElementProbe.js'
 import {
 	buildElementsPageMeta,
 	enrichObservationWithVision,
 	inspectElement,
 	isAgentPreNavigatePageUrl,
 	listElements,
-	listVisibleElements,
 	observePage,
+	paginateVisibleElements,
 } from './observePage.js'
 import { safeAgentPageUrl, waitForAgentPageSettle } from './waitForAgentPageSettle.js'
 import {
@@ -35,7 +36,15 @@ import {
 	unbindAgentTabSync,
 } from './AgentTabSync.js'
 import { listAgentTabs, switchAgentTab } from './agentTabs.js'
+import { AGENT_QUIET_TOOLS } from './agentToolCatalog.js'
+import {
+	clearPickedSelector,
+	mustPickBeforeAnswer,
+	PICK_ELEMENT_HINT,
+	setPickedSelector,
+} from './agentPick.js'
 import { formatAgentToolErrorForUser } from './formatAgentToolErrorForUser.js'
+import { exportAgentRunGrab } from './GrabExporter.js'
 
 const AGENT_SYSTEM_PROMPT =
 	'You are a browser automation agent for webGrabber. ' +
@@ -82,9 +91,10 @@ export default class AgentRunner {
 	/**
 	 * Run an agent task from a natural-language instruction.
 	 * @param {string} instruction
-	 * @returns {Promise<AgentRunResult>}
+	 * @param {{ exportGrabName?: string | null, exportOverwrite?: boolean }} [options]
+	 * @returns {Promise<AgentRunResult & { exportedGrabPath?: string }>}
 	 */
-	async run(instruction) {
+	async run(instruction, { exportGrabName = null, exportOverwrite = false } = {}) {
 		if (!instruction?.trim()) {
 			throw new Error('Agent instruction is required')
 		}
@@ -112,6 +122,8 @@ export default class AgentRunner {
 		brain.run.agentMode = true
 		brain.run.grabCatalog = grabCatalog
 		brain.run.grabCallStack = []
+		brain.run.visibleElementList = createDefaultVisibleElementListState()
+		brain.run.pickedSelector = null
 		/** @type {AgentRunResult['steps']} */
 		const steps = []
 		const tools = buildAgentTools({ dynamicTools })
@@ -152,6 +164,7 @@ export default class AgentRunner {
 					cacheEnabled,
 					brain,
 					hasNavigated,
+					visibleElementList: brain.run.visibleElementList,
 				}
 
 				let observation
@@ -169,6 +182,9 @@ export default class AgentRunner {
 						title: '',
 						elements: [],
 						elementsPage: buildElementsPageMeta(0, 0, resolveElementPageSize()),
+						visibleElements: [],
+						visibleElementsPage: buildElementsPageMeta(0, 0, resolveElementPageSize()),
+						pickedSelector: brain.run.pickedSelector,
 						lastResult: brain.recall(constants.inputKey),
 						tabs: { activeTabKey: null, tabs: [] },
 						observationError,
@@ -186,6 +202,7 @@ export default class AgentRunner {
 					)
 				}
 				registerCheatsheetSelectors(knownSelectors, observation.elements)
+				registerCheatsheetSelectors(knownSelectors, observation.visibleElements)
 				messages.push({
 					role: 'user',
 					content:
@@ -214,13 +231,15 @@ export default class AgentRunner {
 						const params = JSON.parse(toolCall.function.arguments || '{}')
 						const page = brain.browser.activePage
 
-						present(
-							[
-								{ text: 'Agent tool: ', color: 'blue', style: 'bold' },
-								{ text: toolName, color: 'whiteBright' },
-							],
-							brain,
-						)
+						if (!AGENT_QUIET_TOOLS.has(toolName)) {
+							present(
+								[
+									{ text: 'Agent tool: ', color: 'blue', style: 'bold' },
+									{ text: toolName, color: 'whiteBright' },
+								],
+								brain,
+							)
+						}
 
 						let result
 						let toolError = null
@@ -229,6 +248,7 @@ export default class AgentRunner {
 							policy.validateAction(toolName, params, {
 								currentUrl: page.url(),
 								knownSelectors,
+								pickedSelector: brain.run.pickedSelector,
 							})
 
 							if (dynamicRegistry.has(toolName)) {
@@ -238,11 +258,24 @@ export default class AgentRunner {
 									page,
 									grabCatalog,
 								})
+							} else if (toolName === 'pickElement') {
+								setPickedSelector(brain, params.selector)
+								result = { selector: params.selector, picked: true }
+							} else if (toolName === 'paginateVisibleElements') {
+								const nextState = resolveVisibleElementListState(
+									brain.run.visibleElementList,
+									params,
+								)
+								brain.run.visibleElementList = nextState
+								clearPickedSelector(brain)
+								result = await paginateVisibleElements(page, {
+									tags: nextState.tags,
+									offset: nextState.offset,
+									limit: params.limit,
+								})
+								registerCheatsheetSelectors(knownSelectors, result.elements)
 							} else if (toolName === 'listElements') {
 								result = await listElements(page, params)
-								registerCheatsheetSelectors(knownSelectors, result.elements)
-							} else if (toolName === 'listVisibleElements') {
-								result = await listVisibleElements(page, params)
 								registerCheatsheetSelectors(knownSelectors, result.elements)
 							} else if (toolName === 'listTabs') {
 								result = await listAgentTabs(brain)
@@ -288,6 +321,7 @@ export default class AgentRunner {
 							(isMutatingAgentTool(toolName) || dynamicToolNames.has(toolName)) &&
 							!toolError
 						) {
+							clearPickedSelector(brain)
 							knownSelectors.clear()
 							const pageBeforeSync = brain.browser.activePage
 							await syncAgentBrowserTabs(brain)
@@ -315,6 +349,14 @@ export default class AgentRunner {
 				}
 
 				if (assistantMessage.content?.trim()) {
+					if (mustPickBeforeAnswer(steps, brain.run.pickedSelector, { hasNavigated })) {
+						messages.push({
+							role: 'user',
+							content: PICK_ELEMENT_HINT,
+						})
+						continue
+					}
+
 					answer = assistantMessage.content.trim()
 					break
 				}
@@ -335,13 +377,35 @@ export default class AgentRunner {
 				{ force: true },
 			)
 
-			return {
+			/** @type {AgentRunResult & { exportedGrabPath?: string }} */
+			const runResult = {
 				answer,
 				steps,
 				memory: {
 					input: brain.recall(constants.inputKey),
 				},
 			}
+
+			if (exportGrabName) {
+				runResult.exportedGrabPath = await exportAgentRunGrab({
+					steps,
+					instruction,
+					exportGrabName,
+					exportOverwrite,
+					dynamicRegistry,
+				})
+
+				present(
+					[
+						{ text: 'Exported grab: ', color: 'green', style: 'bold' },
+						{ text: runResult.exportedGrabPath, color: 'whiteBright' },
+					],
+					brain,
+					{ force: true },
+				)
+			}
+
+			return runResult
 		} finally {
 			if (agentBrowser) {
 				unbindAgentTabSync(agentBrowser)

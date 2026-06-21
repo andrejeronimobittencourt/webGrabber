@@ -32,21 +32,26 @@ test('navigate tool requires url parameter', () => {
 	assert.deepStrictEqual(navigate.function.parameters.required, ['url'])
 })
 
-test('listElements and listVisibleElements treat offset as optional with default 0', () => {
+test('listElements and paginateVisibleElements treat offset as optional', () => {
 	const tools = buildAgentTools()
 	const listElements = tools.find((tool) => tool.function.name === 'listElements')
-	const listVisibleElements = tools.find((tool) => tool.function.name === 'listVisibleElements')
+	const paginateVisibleElements = tools.find(
+		(tool) => tool.function.name === 'paginateVisibleElements',
+	)
+	const pickElement = tools.find((tool) => tool.function.name === 'pickElement')
 
 	assert.ok(listElements)
-	assert.ok(listVisibleElements)
+	assert.ok(paginateVisibleElements)
+	assert.ok(pickElement)
 	assert.deepStrictEqual(listElements.function.parameters.required, [])
-	assert.deepStrictEqual(listVisibleElements.function.parameters.required, ['tags'])
+	assert.deepStrictEqual(paginateVisibleElements.function.parameters.required, [])
+	assert.deepStrictEqual(pickElement.function.parameters.required, ['selector'])
 	assert.match(
 		listElements.function.parameters.properties.offset.description,
 		/Defaults to 0/,
 	)
 	assert.match(
-		listVisibleElements.function.parameters.properties.offset.description,
-		/Defaults to 0/,
+		paginateVisibleElements.function.parameters.properties.offset.description,
+		/Defaults to the current page/,
 	)
 })

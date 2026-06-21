@@ -101,11 +101,11 @@ const AGENT_TOOL_DEFINITIONS = [
 	{
 		type: 'function',
 		function: {
-			name: 'listVisibleElements',
+			name: 'paginateVisibleElements',
 			description:
-				'List visible non-interactive or readable elements by primitive HTML tags. ' +
-				'Returns generated selectors and text previews—use getElements with one of those selectors to read full text. ' +
-				'Do not invent selectors.',
+				'Change the visibleElements page shown in the next observation. ' +
+				'Use visibleElementsPage.totalPages and pageIndex; offset = pageIndex * limit. ' +
+				'Call pickElement with one returned selector before acting on it or answering from it.',
 			parameters: {
 				type: 'object',
 				properties: {
@@ -113,18 +113,38 @@ const AGENT_TOOL_DEFINITIONS = [
 						type: 'array',
 						items: { type: 'string' },
 						description:
-							'Primitive tags to scan, such as p, h1, span, div, li, time, or a.',
+							'Optional primitive tags to scan, such as p, h1, span, div, li, time, or a.',
 					},
 					offset: {
 						type: 'number',
-						description: 'Optional zero-based element offset. Defaults to 0.',
+						description: 'Optional zero-based visible element offset. Defaults to the current page.',
 					},
 					limit: {
 						type: 'number',
 						description: `Optional page size. Defaults to ${DEFAULT_AGENT_ELEMENT_PAGE_SIZE}.`,
 					},
 				},
-				required: ['tags'],
+				required: [],
+				additionalProperties: false,
+			},
+		},
+	},
+	{
+		type: 'function',
+		function: {
+			name: 'pickElement',
+			description:
+				'Signal which element from the observation you are acting on or answering from. ' +
+				'Required before click, type, inspectElement, pressKey, getElements, or your final answer.',
+			parameters: {
+				type: 'object',
+				properties: {
+					selector: {
+						type: 'string',
+						description: 'Selector copied exactly from the observation.',
+					},
+				},
+				required: ['selector'],
 				additionalProperties: false,
 			},
 		},
@@ -221,14 +241,14 @@ const AGENT_TOOL_DEFINITIONS = [
 		function: {
 			name: 'getElements',
 			description:
-				'Extract text or attribute values from an element. ' +
-				'Use a selector exactly as returned by elements, listElements, or listVisibleElements.',
+				'Read text or an attribute from the DOM when visibleElements is not enough. ' +
+				'Call pickElement with the same selector first.',
 			parameters: {
 				type: 'object',
 				properties: {
 					selector: {
 						type: 'string',
-						description: 'Selector copied from elements or listVisibleElements results.',
+						description: 'Selector copied from the observation and already picked with pickElement.',
 					},
 					attribute: { type: 'string', description: 'Optional attribute to read.' },
 				},
