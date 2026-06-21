@@ -17,6 +17,35 @@ function resolveMaxCallDepth() {
  * @typedef {Array<{ name: string, params?: Record<string, unknown>, await?: boolean }>} GrabActionList
  */
 
+/** Actions whose CLI banner is replaced by presentGrabbing. */
+export const GRAB_BANNER_ACTIONS = new Set(['runGrab'])
+
+/**
+ * Log grab start in CLI/server runs. Agent mode suppresses nested grab banners.
+ * @param {Brain} brain
+ * @param {string} grabName
+ */
+export function presentGrabbing(brain, grabName) {
+	if (!brain.run.agentMode) {
+		present([{ text: `Grabbing ${grabName}`, color: 'green', style: 'bold' }], brain)
+	}
+}
+
+/**
+ * Run a top-level grab from the CLI or server entrypoint.
+ * @param {Brain} brain
+ * @param {{ name: string, verbose?: number, actions: GrabActionList }} grab
+ */
+export async function runRootGrab(brain, grab) {
+	brain.presenter.verbose = grab.verbose ?? 1
+	brain.presenter.indentation = 0
+	presentGrabbing(brain, grab.name)
+	brain.run.params = { dir: grab.name }
+	await brain.perform('setBaseDir')
+	await brain.perform('resetCurrentDir')
+	await runGrabActionList(brain, grab.actions)
+}
+
 /**
  * Run a grab action list on the active browser page.
  * @param {Brain} brain
@@ -83,9 +112,7 @@ export async function executeGrab(brain, grabName, params = {}, { grabCatalog })
 			brain.learn(key, value)
 		}
 
-		if (!brain.run.agentMode) {
-			present([{ text: `Running grab ${grab.name}`, color: 'green', style: 'bold' }], brain)
-		}
+		presentGrabbing(brain, grab.name)
 
 		await runGrabActionList(brain, grab.actions)
 

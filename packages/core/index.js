@@ -7,7 +7,13 @@ export { default as CustomActionList } from './actions/CustomActionList.js'
 export { actionSchemas } from './schemas/actionSchemas.js'
 export { grabSchema, formatGrabValidationError } from './schemas/grabSchema.js'
 export { default as GrabCatalog, validateGrabCatalog, detectGrabCycle } from './grabCatalog.js'
-export { executeGrab, runGrabActionList } from './grabExecution.js'
+export {
+	executeGrab,
+	GRAB_BANNER_ACTIONS,
+	presentGrabbing,
+	runGrabActionList,
+	runRootGrab,
+} from './grabExecution.js'
 export { validateGrabParameters, resolveGrabParameterSchema } from './grabParameters.js'
 export { default as constants } from './utils/constants.js'
 export { FileSystem } from './utils/FileSystem.js'

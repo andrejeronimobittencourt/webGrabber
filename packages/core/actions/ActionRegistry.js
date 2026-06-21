@@ -1,4 +1,5 @@
 import { interpolation } from '../utils/interpolation.js'
+import { GRAB_BANNER_ACTIONS } from '../grabExecution.js'
 import { present } from '../infrastructure/presenter/present.js'
 import { validateActionParams } from '../schemas/actionSchemas.js'
 import { ActionError } from '../errors/ActionErrors.js'
@@ -118,7 +119,7 @@ export class ActionList {
 
 		logger.debug(`Starting action: ${name}`)
 
-		if (!brain.run.agentMode) {
+		if (!brain.run.agentMode && !GRAB_BANNER_ACTIONS.has(name)) {
 			present(
 				[
 					{ text: 'Running action : ', color: 'blue', style: 'bold' },

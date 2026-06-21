@@ -4,7 +4,7 @@ import { present } from '../../../packages/core/infrastructure/presenter/present
 import { loadGrabs, loadGrabCatalog } from '../../utils/loadGrabs.js'
 import { parseModeAndGrabName } from '../../utils/cliArgs.js'
 import constants from '../../../packages/core/utils/constants.js'
-import { runGrabActionList } from '../../../packages/core/grabExecution.js'
+import { runRootGrab } from '../../../packages/core/grabExecution.js'
 
 export default class Grabber {
 	#engine
@@ -109,16 +109,8 @@ export default class Grabber {
 		for (const grab of grabList.list) {
 			if (grabName && grabName !== grab.name && !payload) continue
 
-			brain.presenter.verbose = grab.verbose ?? 1
-			brain.presenter.indentation = 0
-			present([{ text: `Grabbing ${grab.name}`, color: 'green', style: 'bold' }], brain)
-			brain.run.params = { dir: grab.name }
-			await brain.perform('setBaseDir')
-			await brain.perform('resetCurrentDir')
-
-			await runGrabActionList(brain, grab.actions)
+			await runRootGrab(brain, grab)
 		}
-
 	}
 
 	#buildResult(brain) {

@@ -4,7 +4,7 @@ import BrainFactory from '../packages/core/brain/BrainFactory.js'
 import { ActionListContainer } from '../packages/core/actions/ActionRegistry.js'
 import CoreActionList from '../packages/core/actions/CoreActionList.js'
 import GrabCatalog from '../packages/core/grabCatalog.js'
-import { executeGrab } from '../packages/core/grabExecution.js'
+import { executeGrab, GRAB_BANNER_ACTIONS, runRootGrab } from '../packages/core/grabExecution.js'
 import { rootPathJoin } from '../packages/core/utils/paths.js'
 import constants from '../packages/core/utils/constants.js'
 
@@ -24,6 +24,31 @@ function createExecutionBrain() {
 	brain.run.grabCallStack = []
 	return brain
 }
+
+test('GRAB_BANNER_ACTIONS delegates runGrab progress to presentGrabbing', () => {
+	assert.strictEqual(GRAB_BANNER_ACTIONS.has('runGrab'), true)
+})
+
+test('runRootGrab runs setup actions before grab actions', async () => {
+	const brain = createExecutionBrain()
+	/** @type {string[]} */
+	const performedActions = []
+	const originalPerform = brain.perform.bind(brain)
+
+	brain.perform = async (name, page) => {
+		performedActions.push(name)
+		return originalPerform(name, page)
+	}
+
+	await runRootGrab(brain, {
+		name: 'root-grab',
+		actions: [{ name: 'setVariable', params: { key: 'FLAG', value: '1' } }],
+	})
+
+	assert.strictEqual(performedActions[0], 'setBaseDir')
+	assert.strictEqual(performedActions[1], 'resetCurrentDir')
+	assert.strictEqual(performedActions.at(-1), 'setVariable')
+})
 
 test('executeGrab runs importable grab actions and maps parameters', async () => {
 	const brain = createExecutionBrain()
