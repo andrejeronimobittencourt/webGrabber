@@ -1,4 +1,5 @@
 import { v4 as uuidv4 } from 'uuid'
+import { tryBringToFront } from './agentPageHelpers.js'
 
 /** @type {WeakMap<import('puppeteer').Browser, (target: import('puppeteer').Target) => Promise<void>>} */
 const browserListeners = new WeakMap()
@@ -37,12 +38,7 @@ export async function adoptAgentPage(brain, page) {
 
 	brain.browser.activePage = page
 	bindPagePopupListener(brain, page)
-
-	try {
-		await page.bringToFront()
-	} catch {
-		// Tab may still be loading.
-	}
+	await tryBringToFront(page)
 }
 
 /**

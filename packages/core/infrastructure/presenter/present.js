@@ -1,13 +1,13 @@
-import NullPresenter from './NullPresenter.js'
+import constants from '../../utils/constants.js'
 
-/** @type {import('./PresenterBase.js').default} */
-let presenter = new NullPresenter()
+/** @type {import('./PresenterBase.js').default | null} */
+let presenter = null
 
 /** @type {boolean} */
 let serverMode = false
 
 /**
- * Set the process-wide output adapter (CLI or server logger).
+ * Set the process-wide presenter (CLI or server logger).
  * @param {import('./PresenterBase.js').default} nextPresenter
  */
 export const setPresenter = (nextPresenter) => {
@@ -33,6 +33,10 @@ export const setServerMode = (enabled) => {
  * @param {PresentOptions} [options]
  */
 export const present = (textData, brain = null, options = {}) => {
+	if (!presenter) {
+		return
+	}
+
 	if (!serverMode && !options.force && brain?.presenter.verbose === 0) {
 		return
 	}
@@ -44,6 +48,10 @@ export const present = (textData, brain = null, options = {}) => {
  * @param {Error | { message: string }} error
  */
 export const presentError = (error) => {
+	if (!presenter) {
+		return
+	}
+
 	presenter.error(error)
 }
 
@@ -51,19 +59,34 @@ export const presentError = (error) => {
  * @param {ReturnType<import('../../brain/BrainFactory.js').default['create']>} brain
  */
 export const resetIndentation = (brain) => {
-	presenter.resetIndentation(brain)
+	if (presenter) {
+		presenter.resetIndentation(brain)
+		return
+	}
+
+	brain.presenter.indentation = 0
 }
 
 /**
  * @param {ReturnType<import('../../brain/BrainFactory.js').default['create']>} brain
  */
 export const incrementIndentation = (brain) => {
-	presenter.incrementIndentation(brain)
+	if (presenter) {
+		presenter.incrementIndentation(brain)
+		return
+	}
+
+	brain.presenter.indentation += constants.indentStep
 }
 
 /**
  * @param {ReturnType<import('../../brain/BrainFactory.js').default['create']>} brain
  */
 export const decrementIndentation = (brain) => {
-	presenter.decrementIndentation(brain)
+	if (presenter) {
+		presenter.decrementIndentation(brain)
+		return
+	}
+
+	brain.presenter.indentation -= constants.indentStep
 }

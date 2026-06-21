@@ -2,7 +2,7 @@ import PresenterBase from '../../../packages/core/infrastructure/presenter/Prese
 import logger from '../../utils/logger.js'
 
 /**
- * Server output adapter that routes runtime messages to winston (no ANSI colors).
+ * Server presenter that routes runtime messages to winston.
  */
 export default class LoggerPresenter extends PresenterBase {
 	/**

@@ -1,9 +1,10 @@
 import { present } from '../infrastructure/presenter/present.js'
+
 /**
- * Retry a function with exponential backoff
- * @param {Function} fn - Async function to retry
- * @param {Object} options - Retry options
- * @returns {Promise} Result of the function
+ * Retry a function with exponential backoff.
+ * @param {Function} fn
+ * @param {Object} [options]
+ * @returns {Promise<*>}
  */
 export const retryWithBackoff = async (fn, options = {}) => {
 	const {
@@ -11,8 +12,8 @@ export const retryWithBackoff = async (fn, options = {}) => {
 		initialDelay = 1000,
 		maxDelay = 10000,
 		backoffMultiplier = 2,
-		retryOn = () => true, // Function to determine if error is retryable
-		onRetry = null, // Callback on retry
+		retryOn = () => true,
+		onRetry = null,
 		brain = null,
 	} = options
 
@@ -25,40 +26,38 @@ export const retryWithBackoff = async (fn, options = {}) => {
 		} catch (error) {
 			attempt++
 
-			// Check if we should retry this error
 			if (!retryOn(error) || attempt >= maxAttempts) {
 				throw error
 			}
 
-			// Calculate delay with exponential backoff
 			const currentDelay = Math.min(delay, maxDelay)
 
 			if (brain) {
-				present([
-					{
-						text: `: Retry ${attempt}/${maxAttempts} after ${currentDelay}ms`,
-						color: 'yellow',
-						style: 'italic',
-					},
-				], brain)
+				present(
+					[
+						{
+							text: `: Retry ${attempt}/${maxAttempts} after ${currentDelay}ms`,
+							color: 'yellow',
+							style: 'italic',
+						},
+					],
+					brain,
+				)
 			}
 
-			// Call retry callback if provided
 			if (onRetry) {
 				await onRetry(error, attempt, currentDelay)
 			}
 
-			// Wait before retrying
 			await new Promise((resolve) => setTimeout(resolve, currentDelay))
-
-			// Increase delay for next attempt
 			delay *= backoffMultiplier
 		}
 	}
 }
 
 /**
- * Determine if an error is retryable
+ * @param {Error} error
+ * @returns {boolean}
  */
 export const isRetryableError = (error) => {
 	const retryableMessages = [

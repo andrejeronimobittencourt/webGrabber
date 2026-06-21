@@ -9,16 +9,15 @@ import constants from '../../utils/constants.js'
  */
 
 /**
- * Base output adapter for grab runtime messages.
- * Subclasses implement write/error; indentation helpers are shared.
+ * Base class for CLI and server presenters.
  */
 export default class PresenterBase {
 	/**
 	 * @param {TextSegment[]} textData
-	 * @param {ReturnType<import('../../core/brain/BrainFactory.js').default['create']> | null} brain
+	 * @param {ReturnType<import('../../brain/BrainFactory.js').default['create']> | null} brain
 	 */
 	write(_textData, _brain) {
-		throw new Error('PresenterBase.write() must be implemented by subclass')
+		throw new Error(`${this.constructor.name} must implement write()`)
 	}
 
 	/**
@@ -30,21 +29,21 @@ export default class PresenterBase {
 	}
 
 	/**
-	 * @param {ReturnType<import('../../core/brain/BrainFactory.js').default['create']>} brain
+	 * @param {ReturnType<import('../../brain/BrainFactory.js').default['create']>} brain
 	 */
 	resetIndentation(brain) {
 		brain.presenter.indentation = 0
 	}
 
 	/**
-	 * @param {ReturnType<import('../../core/brain/BrainFactory.js').default['create']>} brain
+	 * @param {ReturnType<import('../../brain/BrainFactory.js').default['create']>} brain
 	 */
 	incrementIndentation(brain) {
 		brain.presenter.indentation += constants.indentStep
 	}
 
 	/**
-	 * @param {ReturnType<import('../../core/brain/BrainFactory.js').default['create']>} brain
+	 * @param {ReturnType<import('../../brain/BrainFactory.js').default['create']>} brain
 	 */
 	decrementIndentation(brain) {
 		brain.presenter.indentation -= constants.indentStep
@@ -52,7 +51,7 @@ export default class PresenterBase {
 
 	/**
 	 * @param {TextSegment[]} textData
-	 * @param {ReturnType<import('../../core/brain/BrainFactory.js').default['create']> | null} brain
+	 * @param {ReturnType<import('../../brain/BrainFactory.js').default['create']> | null} brain
 	 * @returns {TextSegment[]}
 	 */
 	prepareSegments(textData, brain) {

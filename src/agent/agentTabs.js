@@ -1,6 +1,6 @@
 import { v4 as uuidv4 } from 'uuid'
-import { present } from '../../packages/core/infrastructure/presenter/present.js'
 import { adoptAgentPage } from './AgentTabSync.js'
+import { safePageTitle, tryBringToFront } from './agentPageHelpers.js'
 import { safeAgentPageUrl } from './waitForAgentPageSettle.js'
 
 /**
@@ -72,12 +72,7 @@ export async function listAgentTabs(brain) {
 			activeTabKey = tabKey
 		}
 
-		let title = ''
-		try {
-			title = await page.title()
-		} catch {
-			// Tab may still be loading.
-		}
+		let title = await safePageTitle(page)
 
 		tabs.push({
 			tabKey,
@@ -109,17 +104,10 @@ export async function switchAgentTab(brain, tabKey) {
 
 	await adoptAgentPage(brain, page)
 
-	let title = ''
-	try {
-		title = await page.title()
-	} catch {
-		// Tab may still be loading.
-	}
-
 	return {
 		tabKey,
 		url: await safeAgentPageUrl(page),
-		title,
+		title: await safePageTitle(page),
 		active: true,
 	}
 }

@@ -4,6 +4,7 @@ import { pathJoin } from '../../utils/paths.js'
 import { FileSystem } from '../../utils/FileSystem.js'
 import { SelectorError, NetworkError } from '../../errors/ActionErrors.js'
 import { retryWithBackoff, isRetryableError } from '../../utils/retry.js'
+import { safePageUrl } from '../../utils/safePageUrl.js'
 
 const WAITUNTIL = 'networkidle0'
 
@@ -56,16 +57,9 @@ export default class InteractionActions {
 						throw error
 					}
 
-					let pageUrl = 'unknown'
-					try {
-						pageUrl = page.url()
-					} catch {
-						// Navigation may have destroyed the execution context.
-					}
-
 					throw new SelectorError('click', selector, {
 						originalError: error.message,
-						pageUrl,
+						pageUrl: safePageUrl(page),
 					})
 				}
 			}
@@ -120,16 +114,9 @@ export default class InteractionActions {
 					await page.waitForSelector(selector, { visible: true, timeout: 5000 })
 					await page.type(selector, text)
 				} catch (error) {
-					let pageUrl = 'unknown'
-					try {
-						pageUrl = page.url()
-					} catch {
-						// Navigation may have destroyed the execution context.
-					}
-
 					throw new SelectorError('type', selector, {
 						originalError: error.message,
-						pageUrl,
+						pageUrl: safePageUrl(page),
 					})
 				}
 			}

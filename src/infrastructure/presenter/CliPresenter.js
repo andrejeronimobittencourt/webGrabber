@@ -2,7 +2,7 @@ import StyledConsole from '../StyledConsole.js'
 import PresenterBase from '../../../packages/core/infrastructure/presenter/PresenterBase.js'
 
 /**
- * CLI output adapter using chalk-colored console output.
+ * CLI presenter using chalk-colored console output.
  */
 export default class CliPresenter extends PresenterBase {
 	/**

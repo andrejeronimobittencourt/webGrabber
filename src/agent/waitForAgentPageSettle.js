@@ -1,14 +1,11 @@
+import { safePageUrl } from '../../packages/core/utils/safePageUrl.js'
+
 /**
- * Read the current page URL without throwing when the execution context is mid-navigation.
  * @param {import('puppeteer').Page} page
  * @returns {Promise<string>}
  */
 export async function safeAgentPageUrl(page) {
-	try {
-		return page.url()
-	} catch {
-		return 'unknown'
-	}
+	return safePageUrl(page)
 }
 
 /**
@@ -33,7 +30,7 @@ export async function waitForAgentPageSettle(page, options = {}) {
 				break
 			}
 		} catch {
-			// Navigation can temporarily destroy the execution context.
+			continue
 		}
 
 		await new Promise((resolve) => setTimeout(resolve, 100))
@@ -43,7 +40,5 @@ export async function waitForAgentPageSettle(page, options = {}) {
 		if (typeof page.waitForNetworkIdle === 'function') {
 			await page.waitForNetworkIdle({ idleTime: 500, timeout: 3_000 })
 		}
-	} catch {
-		// Best-effort network settle.
-	}
+	} catch {}
 }
