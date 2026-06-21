@@ -92,7 +92,7 @@ export default class AgentRunner {
 		present([{ text: 'Agent taking control', color: 'green', style: 'bold' }])
 		present([{ text: instruction, color: 'whiteBright' }], null, { force: true })
 
-		const grabCatalog = await this.#loadGrabCatalog()
+		const grabCatalog = await this.#loadGrabCatalog({ warnOnInvalid: false })
 		const importableGrabs = grabCatalog.listImportable()
 		const importableCustomActions = this.#engine.listImportableCustomActions()
 		const dynamicTools = buildDynamicAgentTools({

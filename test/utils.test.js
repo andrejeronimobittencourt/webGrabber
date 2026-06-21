@@ -162,6 +162,43 @@ test('loadGrabs in catalogMode suppresses warnings for unrelated invalid grabs',
 	}
 })
 
+test('loadGrabs in catalogMode with warnOnInvalid false skips all invalid grab warnings', async () => {
+	const originalReaddir = FileSystem.readdir
+	const originalReadFile = FileSystem.readFile
+
+	FileSystem.readdir = async () => ['valid.json', 'invalid.json']
+	FileSystem.readFile = async (filePath) => {
+		if (filePath.endsWith('valid.json')) {
+			return JSON.stringify({
+				name: 'valid',
+				importable: true,
+				actions: [{ name: 'log', params: { message: 'ok' } }],
+			})
+		}
+
+		return JSON.stringify({
+			name: 'invalid',
+			actions: [{ name: 'missingAction' }],
+		})
+	}
+
+	const originalWarn = console.warn
+	let warnCount = 0
+	console.warn = () => {
+		warnCount++
+	}
+
+	try {
+		const grabs = await loadGrabs({ catalogMode: true, warnOnInvalid: false })
+		assert.strictEqual(grabs.length, 1)
+		assert.strictEqual(warnCount, 0)
+	} finally {
+		FileSystem.readdir = originalReaddir
+		FileSystem.readFile = originalReadFile
+		console.warn = originalWarn
+	}
+})
+
 test('formatGrabValidationError uses grab name in issue labels', () => {
 	const error = new z.ZodError([
 		{

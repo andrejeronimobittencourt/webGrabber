@@ -33,11 +33,16 @@ const resolveGrabLabel = (file, doc) => doc?.name ?? fileStem(file)
 
 /**
  * Load grab configurations from grabs folder.
- * @param {{ grabName?: string | null, catalogMode?: boolean, warnForGrabName?: string | null }} [options]
+ * @param {{ grabName?: string | null, catalogMode?: boolean, warnForGrabName?: string | null, warnOnInvalid?: boolean }} [options]
  * @returns {Promise<Array>} Array of validated grab configurations
  */
 export const loadGrabs = async (options = {}) => {
-	const { grabName = null, catalogMode = false, warnForGrabName = grabName } = options
+	const {
+		grabName = null,
+		catalogMode = false,
+		warnForGrabName = grabName,
+		warnOnInvalid = true,
+	} = options
 	const grabsPath = rootPathJoin('grabs')
 	const files = await FileSystem.readdir(grabsPath)
 	const grabList = []
@@ -64,7 +69,10 @@ export const loadGrabs = async (options = {}) => {
 		const grabLabel = resolveGrabLabel(file, doc)
 		const result = grabSchema.safeParse(doc)
 		if (!result.success) {
-			if (!warnForGrabName || matchesGrabFilter(file, doc, warnForGrabName)) {
+			if (
+				warnOnInvalid &&
+				(!warnForGrabName || matchesGrabFilter(file, doc, warnForGrabName))
+			) {
 				console.warn(
 					StyledConsole.create([
 						{
@@ -82,7 +90,7 @@ export const loadGrabs = async (options = {}) => {
 		doc = result.data
 
 		if (grabList.some((g) => g.name === doc.name)) {
-			if (!warnForGrabName) {
+			if (warnOnInvalid && !warnForGrabName) {
 				console.warn(
 					StyledConsole.create([
 						{
@@ -104,12 +112,12 @@ export const loadGrabs = async (options = {}) => {
 
 /**
  * Load all grabs and validate importable composition rules.
- * @param {{ warnForGrabName?: string | null }} [options]
+ * @param {{ warnForGrabName?: string | null, warnOnInvalid?: boolean }} [options]
  * @returns {Promise<GrabCatalog>}
  */
 export const loadGrabCatalog = async (options = {}) => {
-	const { warnForGrabName = null } = options
-	const grabs = await loadGrabs({ catalogMode: true, warnForGrabName })
+	const { warnForGrabName = null, warnOnInvalid = true } = options
+	const grabs = await loadGrabs({ catalogMode: true, warnForGrabName, warnOnInvalid })
 	validateGrabCatalog(grabs)
 	return new GrabCatalog(grabs)
 }
