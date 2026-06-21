@@ -24,6 +24,34 @@ test('AgentPolicy rejects blocked actions', () => {
 	)
 })
 
+test('AgentPolicy validates dynamic importable grab tools', () => {
+	const dynamicRegistry = new Map([
+		[
+			'grab_login_flow',
+			{
+				kind: 'grab',
+				grabName: 'login-flow',
+				parameterSchema: {
+					type: 'object',
+					properties: { username: { type: 'string' } },
+					required: ['username'],
+					additionalProperties: false,
+				},
+			},
+		],
+	])
+	const policy = new AgentPolicy({ dynamicRegistry })
+
+	assert.strictEqual(policy.isAllowedAction('grab_login_flow'), true)
+	assert.doesNotThrow(() =>
+		policy.validateAction('grab_login_flow', { username: 'ada' }),
+	)
+	assert.throws(
+		() => policy.validateAction('grab_login_flow', {}),
+		/Missing required parameter "username"/,
+	)
+})
+
 test('AgentPolicy enforces AGENT_ALLOWED_HOSTS for navigate', () => {
 	const previous = process.env.AGENT_ALLOWED_HOSTS
 	process.env.AGENT_ALLOWED_HOSTS = 'example.com'

@@ -5,6 +5,7 @@ import BrowserActions from './handlers/BrowserActions.js'
 import FilesystemActions from './handlers/FilesystemActions.js'
 import ControlActions from './handlers/ControlActions.js'
 import MiscActions from './handlers/MiscActions.js'
+import GrabActions from './handlers/GrabActions.js'
 
 export default class CoreActionList extends ActionList {
 	constructor() {
@@ -19,5 +20,6 @@ export default class CoreActionList extends ActionList {
 		FilesystemActions.register(this)
 		ControlActions.register(this)
 		MiscActions.register(this)
+		GrabActions.register(this)
 	}
 }

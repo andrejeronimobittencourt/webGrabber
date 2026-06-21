@@ -125,6 +125,43 @@ test('loadGrabs with grabName only loads the targeted grab', async () => {
 	}
 })
 
+test('loadGrabs in catalogMode suppresses warnings for unrelated invalid grabs', async () => {
+	const originalReaddir = FileSystem.readdir
+	const originalReadFile = FileSystem.readFile
+
+	FileSystem.readdir = async () => ['valid.json', 'invalid.json']
+	FileSystem.readFile = async (filePath) => {
+		if (filePath.endsWith('valid.json')) {
+			return JSON.stringify({
+				name: 'valid',
+				actions: [{ name: 'log', params: { message: 'ok' } }],
+			})
+		}
+
+		return JSON.stringify({
+			name: 'invalid',
+			actions: [{ name: 'missingAction' }],
+		})
+	}
+
+	const originalWarn = console.warn
+	let warnCount = 0
+	console.warn = () => {
+		warnCount++
+	}
+
+	try {
+		const grabs = await loadGrabs({ catalogMode: true, warnForGrabName: 'valid' })
+		assert.strictEqual(grabs.length, 1)
+		assert.strictEqual(grabs[0].name, 'valid')
+		assert.strictEqual(warnCount, 0)
+	} finally {
+		FileSystem.readdir = originalReaddir
+		FileSystem.readFile = originalReadFile
+		console.warn = originalWarn
+	}
+})
+
 test('formatGrabValidationError uses grab name in issue labels', () => {
 	const error = new z.ZodError([
 		{
@@ -192,6 +229,40 @@ test('grabSchema defaults verbose to 1 and accepts 0 for silent mode', () => {
 		actions: [{ name: 'log', params: { message: 'ok' } }],
 	})
 	assert.strictEqual(silent.verbose, 0)
+})
+
+test('grabSchema accepts importable grabs with parameters', () => {
+	const grab = grabSchema.parse({
+		name: 'helper',
+		importable: true,
+		parameters: {
+			type: 'object',
+			properties: {
+				username: { type: 'string' },
+			},
+			required: ['username'],
+			additionalProperties: false,
+		},
+		actions: [{ name: 'log', params: { message: '{{username}}' } }],
+	})
+
+	assert.strictEqual(grab.importable, true)
+	assert.strictEqual(grab.parameters?.required?.[0], 'username')
+})
+
+test('grabSchema rejects parameters on non-importable grabs', () => {
+	const result = grabSchema.safeParse({
+		name: 'invalid',
+		parameters: {
+			type: 'object',
+			properties: {},
+			additionalProperties: false,
+		},
+		actions: [{ name: 'log', params: { message: 'ok' } }],
+	})
+
+	assert.strictEqual(result.success, false)
+	assert.match(result.error.issues[0].message, /parameters requires importable: true/)
 })
 
 test('removeOutputDir deletes created output directories', async () => {

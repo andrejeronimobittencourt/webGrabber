@@ -32,5 +32,5 @@ features:
   - title: Agent Mode
     details: Run browser tasks from natural-language instructions.
   - title: Custom Actions
-    details: Extend the engine with your own JavaScript actions when built-ins are not enough.
+    details: Add your own JavaScript actions when built-ins are not enough.
 ---

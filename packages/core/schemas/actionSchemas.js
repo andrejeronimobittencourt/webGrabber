@@ -5,6 +5,7 @@ import * as browser from './actions/browser.js'
 import * as filesystem from './actions/filesystem.js'
 import * as control from './actions/control.js'
 import * as misc from './actions/misc.js'
+import * as grab from './actions/grab.js'
 
 export const actionSchemas = {
 	// Variables & Counters
@@ -66,6 +67,7 @@ export const actionSchemas = {
 	uuid: misc.uuid,
 	getExtension: misc.getExtension,
 	userInput: misc.userInput,
+	runGrab: grab.runGrab,
 }
 
 import { registerActionSchemas } from './refineAction.js'

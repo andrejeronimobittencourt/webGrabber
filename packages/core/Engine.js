@@ -5,6 +5,7 @@ import CoreActionList from './actions/CoreActionList.js'
 import CustomActionList from './actions/CustomActionList.js'
 import { present } from './infrastructure/presenter/present.js'
 import constants from './utils/constants.js'
+import { BUILTIN_AGENT_TOOL_NAMES } from './utils/builtinAgentToolNames.js'
 
 /**
  * Shared browser automation engine bootstrap used by Grabber and AgentRunner.
@@ -23,14 +24,26 @@ export default class Engine {
 	 * Register a custom action handler.
 	 * @param {string} name
 	 * @param {Function} action
-	 * @param {{ serverBlocked?: boolean }} [options]
+	 * @param {{ serverBlocked?: boolean, importable?: boolean, description?: string, parameters?: object }} [options]
 	 */
 	addCustomAction(name, action, options = {}) {
 		if (typeof action !== 'function') throw new Error(`Action ${name} must be a function`)
 		if (this.#coreActionList.has(name) || this.#customActionList.has(name)) {
 			throw new Error(`Action ${name} already exists`)
 		}
+
+		if (options.importable && BUILTIN_AGENT_TOOL_NAMES.includes(name)) {
+			throw new Error(`Action ${name} collides with a built-in agent tool`)
+		}
+
 		this.#customActionList.add(name, action, options)
+	}
+
+	/**
+	 * @returns {Array<{ name: string, description?: string, parameters?: object }>}
+	 */
+	listImportableCustomActions() {
+		return this.#customActionList.listImportable()
 	}
 
 	/**

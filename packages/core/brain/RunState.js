@@ -7,6 +7,10 @@ export default class RunState {
 	#params
 	payloadId
 	agentMode = false
+	/** @type {string[]} */
+	grabCallStack = []
+	/** @type {import('../grabCatalog.js').default | null} */
+	grabCatalog = null
 
 	get params() {
 		return this.#params

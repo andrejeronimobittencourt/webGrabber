@@ -2,24 +2,12 @@
 
 import { CHEATSHEET_SELECTOR_REJECTION_HINT } from './agentCheatsheet.js'
 import { AgentValidationError } from './agentErrors.js'
+import { validateGrabParameters } from '../../packages/core/grabParameters.js'
+import { BUILTIN_AGENT_TOOL_NAMES } from '../../packages/core/utils/builtinAgentToolNames.js'
 
-const ALLOWED_ACTIONS = new Set([
-	'navigate',
-	'click',
-	'type',
-	'pressKey',
-	'listElements',
-	'listVisibleElements',
-	'inspectElement',
-	'listTabs',
-	'switchTab',
-	'getElements',
-	'elementExists',
-	'screenshot',
-	'setVariable',
-	'getVariable',
-	'log',
-])
+/**
+ * @typedef {import('./agentDynamicTools.js').DynamicToolRegistryEntry} DynamicToolRegistryEntry
+ */
 
 const KNOWN_SELECTOR_ACTIONS = new Set([
 	'click',
@@ -35,9 +23,10 @@ const KNOWN_SELECTOR_ACTIONS = new Set([
 export default class AgentPolicy {
 	#maxSteps
 	#allowedHosts
+	#dynamicRegistry
 
 	/**
-	 * @param {{ maxSteps?: number, allowedHosts?: string[] }} [options]
+	 * @param {{ maxSteps?: number, allowedHosts?: string[], dynamicRegistry?: Map<string, DynamicToolRegistryEntry> }} [options]
 	 */
 	constructor(options = {}) {
 		this.#maxSteps =
@@ -48,6 +37,7 @@ export default class AgentPolicy {
 				.split(',')
 				.map((host) => host.trim())
 				.filter(Boolean)
+		this.#dynamicRegistry = options.dynamicRegistry ?? new Map()
 	}
 
 	get maxSteps() {
@@ -63,7 +53,7 @@ export default class AgentPolicy {
 	 * @returns {boolean}
 	 */
 	isAllowedAction(name) {
-		return ALLOWED_ACTIONS.has(name)
+		return BUILTIN_AGENT_TOOL_NAMES.includes(name) || this.#dynamicRegistry.has(name)
 	}
 
 	/**
@@ -72,6 +62,13 @@ export default class AgentPolicy {
 	 * @param {{ currentUrl?: string, knownSelectors?: Set<string> }} [context]
 	 */
 	validateAction(name, params, context = {}) {
+		const dynamicEntry = this.#dynamicRegistry.get(name)
+
+		if (dynamicEntry) {
+			validateGrabParameters(params, dynamicEntry.parameterSchema)
+			return
+		}
+
 		if (!this.isAllowedAction(name)) {
 			throw new Error(`Action "${name}" is not allowed in agent mode`)
 		}

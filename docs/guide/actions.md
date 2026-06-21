@@ -52,11 +52,11 @@ Actions marked **server: no** cannot be used in `POST /grab` payloads (inline se
 
 ## 📂 Filesystem Orchestration
 
-Paths are relative to the grab output root (`output/<grab-name>/`), set automatically at run start.
+Paths are relative to the grab output folder (`output/<grab-name>/`).
 
 | Action | Parameters | Description |
 |--------|------------|-------------|
-| `setBaseDir` | `dir` *(str)* | Override base output directory (normally set by the engine). |
+| `setBaseDir` | `dir` *(str)* | Change the grab's output folder. |
 | `setCurrentDir` **server: no** | `dir` *(str)*, `useBaseDir` *(bool, opt)* | Change working directory. |
 | `resetCurrentDir` | — | Reset working directory to base. |
 | `backToParentDir` **server: no** | — | Move working directory up one level. |
@@ -102,5 +102,6 @@ Nested `actions` / `elseActions` values are arrays of action objects (same shape
 | `matchFromSelector` | `selector` *(str)*, `regex` *(str)*, `attribute` *(str, opt)* | Regex matches on page content → `INPUT`. |
 | `getExtension` | `string` *(str)* | File extension via `path.extname` → `INPUT`. |
 | `userInput` **server: no** | `query` *(str)* | Prompt on stdin → `INPUT`. |
+| `runGrab` | `grab` *(str)*, `params` *(object, opt)* | Run an importable grab by name. Optional `params` supply inputs defined on the target grab. |
 
 *For actions not covered here, see [Custom Actions](./custom-actions.md).*

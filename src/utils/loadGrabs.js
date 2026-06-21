@@ -2,6 +2,7 @@ import yaml from 'js-yaml'
 import StyledConsole from '../infrastructure/StyledConsole.js'
 import { FileSystem } from './FileSystem.js'
 import { grabSchema, formatGrabValidationError } from '../../packages/core/schemas/grabSchema.js'
+import GrabCatalog, { validateGrabCatalog } from '../../packages/core/grabCatalog.js'
 import { pathJoin, rootPathJoin } from './paths.js'
 
 /**
@@ -32,11 +33,11 @@ const resolveGrabLabel = (file, doc) => doc?.name ?? fileStem(file)
 
 /**
  * Load grab configurations from grabs folder.
- * @param {{ grabName?: string | null }} [options]
+ * @param {{ grabName?: string | null, catalogMode?: boolean, warnForGrabName?: string | null }} [options]
  * @returns {Promise<Array>} Array of validated grab configurations
  */
 export const loadGrabs = async (options = {}) => {
-	const { grabName = null } = options
+	const { grabName = null, catalogMode = false, warnForGrabName = grabName } = options
 	const grabsPath = rootPathJoin('grabs')
 	const files = await FileSystem.readdir(grabsPath)
 	const grabList = []
@@ -56,14 +57,14 @@ export const loadGrabs = async (options = {}) => {
 			continue
 		}
 
-		if (!matchesGrabFilter(file, doc, grabName)) {
+		if (!catalogMode && grabName && !matchesGrabFilter(file, doc, grabName)) {
 			continue
 		}
 
 		const grabLabel = resolveGrabLabel(file, doc)
 		const result = grabSchema.safeParse(doc)
 		if (!result.success) {
-			if (!grabName || matchesGrabFilter(file, doc, grabName)) {
+			if (!warnForGrabName || matchesGrabFilter(file, doc, warnForGrabName)) {
 				console.warn(
 					StyledConsole.create([
 						{
@@ -81,7 +82,7 @@ export const loadGrabs = async (options = {}) => {
 		doc = result.data
 
 		if (grabList.some((g) => g.name === doc.name)) {
-			if (!grabName) {
+			if (!warnForGrabName) {
 				console.warn(
 					StyledConsole.create([
 						{
@@ -99,4 +100,16 @@ export const loadGrabs = async (options = {}) => {
 	}
 
 	return grabList
+}
+
+/**
+ * Load all grabs and validate importable composition rules.
+ * @param {{ warnForGrabName?: string | null }} [options]
+ * @returns {Promise<GrabCatalog>}
+ */
+export const loadGrabCatalog = async (options = {}) => {
+	const { warnForGrabName = null } = options
+	const grabs = await loadGrabs({ catalogMode: true, warnForGrabName })
+	validateGrabCatalog(grabs)
+	return new GrabCatalog(grabs)
 }

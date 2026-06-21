@@ -49,7 +49,7 @@ Agent settings use the `AGENT_*` prefix.
 | `AGENT_VISION` | `false` | Set to `true` to analyze page screenshots (helpful on complex layouts) |
 | `AGENT_ALLOWED_HOSTS` | empty | Comma-separated host allowlist for navigation; empty allows all hosts |
 | `AGENT_MAX_STEPS` | `30` | Maximum steps before the run stops |
-| `AGENT_CACHE_OBSERVATIONS` | `true` | Reuse page observations when nothing changed (faster runs) |
+| `AGENT_CACHE_OBSERVATIONS` | `true` | Skip redundant page scans when the page has not changed |
 | `AGENT_REASON_THINKING` | `false` | Enable extended reasoning on supported models |
 | `AGENT_REASONING_EFFORT` | `medium` | Reasoning depth when thinking is enabled: `high`, `medium`, `low`, or `max` |
 
@@ -85,3 +85,11 @@ AGENT_ALLOWED_HOSTS=example.com npm run start:agent "Summarize example.com"
 | Depends on your local Ollama model | Deterministic and fast |
 
 When an agent run works well, you can turn the step log into a grab and run it with the normal CLI (`npm run start <grab-name>`).
+
+## Importable grab tools
+
+Grabs marked `importable: true` in [Grab Files](./grab-files.md) are available to the agent as tools named `grab_<grab-name>` (hyphens become underscores, e.g. `login-flow` → `grab_login_flow`).
+
+Add optional `parameters` on the grab when the agent needs to pass inputs.
+
+Importable [custom actions](./custom-actions.md) are available as agent tools under their action name.

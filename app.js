@@ -3,6 +3,7 @@ import express from 'express'
 import { v4 as uuidv4 } from 'uuid'
 import Grabber from './src/core/grabber/Grabber.js'
 import AgentRunner from './src/agent/AgentRunner.js'
+import Engine from './packages/core/Engine.js'
 import CliPresenter from './src/infrastructure/presenter/CliPresenter.js'
 import LoggerPresenter from './src/infrastructure/presenter/LoggerPresenter.js'
 import { present, presentError, setPresenter, setServerMode } from './src/infrastructure/presenter/present.js'
@@ -82,7 +83,9 @@ const runAgentMode = async () => {
 		throw new Error('Agent mode requires an instruction after --agent')
 	}
 
-	const runner = new AgentRunner()
+	const engine = new Engine()
+	customize(engine)
+	const runner = new AgentRunner({ engine })
 	await runner.init(puppeteerOptions)
 	await runner.run(agentInstruction)
 }

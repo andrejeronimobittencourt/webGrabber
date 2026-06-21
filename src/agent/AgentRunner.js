@@ -14,6 +14,12 @@ import {
 import OllamaClient from './OllamaClient.js'
 import { buildAgentTools } from './ToolSchemaBuilder.js'
 import {
+	buildDynamicAgentTools,
+	buildDynamicToolRegistry,
+} from './agentDynamicTools.js'
+import { runDynamicAgentTool } from './runAgentDynamicTool.js'
+import { loadGrabCatalog } from '../utils/loadGrabs.js'
+import {
 	buildElementsPageMeta,
 	enrichObservationWithVision,
 	inspectElement,
@@ -51,16 +57,18 @@ const AGENT_SYSTEM_PROMPT =
  */
 export default class AgentRunner {
 	#engine
-	#policy
 	#client
+	#policyOptions
+	#loadGrabCatalog
 
 	/**
-	 * @param {{ policy?: AgentPolicy, client?: OllamaClient, engine?: Engine, maxSteps?: number, allowedHosts?: string[] }} [options]
+	 * @param {{ policy?: AgentPolicy, client?: OllamaClient, engine?: Engine, maxSteps?: number, allowedHosts?: string[], loadGrabCatalog?: typeof loadGrabCatalog }} [options]
 	 */
 	constructor(options = {}) {
 		this.#engine = options.engine ?? new Engine()
-		this.#policy = options.policy ?? new AgentPolicy(options)
 		this.#client = options.client ?? new OllamaClient(options)
+		this.#policyOptions = options
+		this.#loadGrabCatalog = options.loadGrabCatalog ?? loadGrabCatalog
 	}
 
 	/**
@@ -84,11 +92,29 @@ export default class AgentRunner {
 		present([{ text: 'Agent taking control', color: 'green', style: 'bold' }])
 		present([{ text: instruction, color: 'whiteBright' }], null, { force: true })
 
+		const grabCatalog = await this.#loadGrabCatalog()
+		const importableGrabs = grabCatalog.listImportable()
+		const importableCustomActions = this.#engine.listImportableCustomActions()
+		const dynamicTools = buildDynamicAgentTools({
+			grabs: importableGrabs,
+			customActions: importableCustomActions,
+		})
+		const dynamicRegistry = buildDynamicToolRegistry(dynamicTools, {
+			grabs: importableGrabs,
+			customActions: importableCustomActions,
+		})
+		const dynamicToolNames = new Set(dynamicRegistry.keys())
+		const policy =
+			this.#policyOptions.policy ??
+			new AgentPolicy({ ...this.#policyOptions, dynamicRegistry })
+
 		const brain = this.#engine.createBrain()
 		brain.run.agentMode = true
+		brain.run.grabCatalog = grabCatalog
+		brain.run.grabCallStack = []
 		/** @type {AgentRunResult['steps']} */
 		const steps = []
-		const tools = buildAgentTools()
+		const tools = buildAgentTools({ dynamicTools })
 		/** @type {import('./OllamaClient.js').OllamaChatMessage[]} */
 		const messages = [
 			{
@@ -114,7 +140,7 @@ export default class AgentRunner {
 			agentBrowser = brain.browser.activePage.browser()
 			bindAgentTabSync(brain, agentBrowser)
 
-			for (let stepIndex = 0; stepIndex < this.#policy.maxSteps; stepIndex += 1) {
+			for (let stepIndex = 0; stepIndex < policy.maxSteps; stepIndex += 1) {
 				const page = brain.browser.activePage
 
 				if (!hasNavigated && !isAgentPreNavigatePageUrl(page.url())) {
@@ -179,7 +205,8 @@ export default class AgentRunner {
 
 				if (assistantMessage.tool_calls?.length) {
 					const usedMutatingTool = assistantMessage.tool_calls.some((toolCall) =>
-						isMutatingAgentTool(toolCall.function.name),
+						isMutatingAgentTool(toolCall.function.name) ||
+						dynamicToolNames.has(toolCall.function.name),
 					)
 
 					for (const toolCall of assistantMessage.tool_calls) {
@@ -199,12 +226,19 @@ export default class AgentRunner {
 						let toolError = null
 
 						try {
-							this.#policy.validateAction(toolName, params, {
+							policy.validateAction(toolName, params, {
 								currentUrl: page.url(),
 								knownSelectors,
 							})
 
-							if (toolName === 'listElements') {
+							if (dynamicRegistry.has(toolName)) {
+								result = await runDynamicAgentTool(dynamicRegistry, toolName, params, {
+									brain,
+									engine: this.#engine,
+									page,
+									grabCatalog,
+								})
+							} else if (toolName === 'listElements') {
 								result = await listElements(page, params)
 								registerCheatsheetSelectors(knownSelectors, result.elements)
 							} else if (toolName === 'listVisibleElements') {
@@ -250,7 +284,10 @@ export default class AgentRunner {
 							hasNavigated = true
 						}
 
-						if (isMutatingAgentTool(toolName) && !toolError) {
+						if (
+							(isMutatingAgentTool(toolName) || dynamicToolNames.has(toolName)) &&
+							!toolError
+						) {
 							knownSelectors.clear()
 							const pageBeforeSync = brain.browser.activePage
 							await syncAgentBrowserTabs(brain)
@@ -286,7 +323,7 @@ export default class AgentRunner {
 			}
 
 			if (!answer) {
-				throw new Error(`Agent run exceeded max steps (${this.#policy.maxSteps})`)
+				throw new Error(`Agent run exceeded max steps (${policy.maxSteps})`)
 			}
 
 			present(

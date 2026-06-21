@@ -1,9 +1,10 @@
 import GrabListFactory from './GrabListFactory.js'
 import Engine from '../../../packages/core/Engine.js'
 import { present } from '../../../packages/core/infrastructure/presenter/present.js'
-import { loadGrabs } from '../../utils/loadGrabs.js'
+import { loadGrabs, loadGrabCatalog } from '../../utils/loadGrabs.js'
 import { parseModeAndGrabName } from '../../utils/cliArgs.js'
 import constants from '../../../packages/core/utils/constants.js'
+import { runGrabActionList } from '../../../packages/core/grabExecution.js'
 
 export default class Grabber {
 	#engine
@@ -16,7 +17,7 @@ export default class Grabber {
 	 * Register a custom action handler.
 	 * @param {string} name
 	 * @param {Function} action
-	 * @param {{ serverBlocked?: boolean }} [options]
+	 * @param {{ serverBlocked?: boolean, importable?: boolean, description?: string, parameters?: object }} [options]
 	 */
 	addCustomAction(name, action, options = {}) {
 		this.#engine.addCustomAction(name, action, options)
@@ -46,6 +47,7 @@ export default class Grabber {
 	async grab(payload = null) {
 		const { helpMode, grabName } = parseModeAndGrabName()
 		const brain = this.#engine.createBrain()
+		brain.run.grabCallStack = []
 
 		try {
 			const grabList = await this.#resolveGrabList(payload, grabName, brain)
@@ -53,6 +55,9 @@ export default class Grabber {
 			if (helpMode) {
 				this.#runHelpMode(grabList, grabName)
 			} else {
+				brain.run.grabCatalog = await loadGrabCatalog({
+					warnForGrabName: payload ? null : grabName,
+				})
 				await this.#engine.bootBrowser(brain)
 				await this.#runGrabActions(brain, grabList, grabName, payload)
 			}
@@ -63,8 +68,8 @@ export default class Grabber {
 		present([{ text: 'Grabber finished', color: 'green', style: 'bold' }])
 
 		if (!payload) {
-			await this.#engine.close()
 			present([{ text: 'Grabber closed', color: 'green', style: 'bold' }])
+			await this.#engine.close()
 			return
 		}
 
@@ -101,8 +106,6 @@ export default class Grabber {
 	}
 
 	async #runGrabActions(brain, grabList, grabName, payload) {
-		const asyncActions = []
-
 		for (const grab of grabList.list) {
 			if (grabName && grabName !== grab.name && !payload) continue
 
@@ -113,18 +116,9 @@ export default class Grabber {
 			await brain.perform('setBaseDir')
 			await brain.perform('resetCurrentDir')
 
-			for (const action of grab.actions) {
-				brain.run.params = action.params || {}
-				const activePage = brain.browser.activePage
-				if (action.await === false) {
-					asyncActions.push(brain.perform(action.name, activePage))
-				} else {
-					await brain.perform(action.name, activePage)
-				}
-			}
+			await runGrabActionList(brain, grab.actions)
 		}
 
-		if (asyncActions.length > 0) await Promise.all(asyncActions)
 	}
 
 	#buildResult(brain) {

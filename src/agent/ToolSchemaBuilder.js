@@ -1,5 +1,6 @@
 import { DEFAULT_AGENT_NAVIGATE_WAIT_UNTIL } from './AgentToolMapper.js'
 import { DEFAULT_AGENT_ELEMENT_PAGE_SIZE } from './agentConfig.js'
+import { BUILTIN_AGENT_TOOL_NAMES } from '../../packages/core/utils/builtinAgentToolNames.js'
 
 /**
  * @typedef {Object} AgentToolDefinition
@@ -321,10 +322,11 @@ const AGENT_TOOL_DEFINITIONS = [
 
 /**
  * Build OpenAI-compatible tool definitions for Ollama agent mode.
+ * @param {{ dynamicTools?: AgentToolDefinition[] }} [options]
  * @returns {AgentToolDefinition[]}
  */
-export function buildAgentTools() {
-	return AGENT_TOOL_DEFINITIONS.map((tool) => ({
+export function buildAgentTools({ dynamicTools = [] } = {}) {
+	return [...AGENT_TOOL_DEFINITIONS, ...dynamicTools].map((tool) => ({
 		type: tool.type,
 		function: {
 			name: tool.function.name,
@@ -335,8 +337,12 @@ export function buildAgentTools() {
 }
 
 /**
+ * @param {{ dynamicTools?: AgentToolDefinition[] }} [options]
  * @returns {string[]}
  */
-export function listAgentToolNames() {
-	return AGENT_TOOL_DEFINITIONS.map((tool) => tool.function.name)
+export function listAgentToolNames({ dynamicTools = [] } = {}) {
+	return [
+		...BUILTIN_AGENT_TOOL_NAMES,
+		...dynamicTools.map((tool) => tool.function.name),
+	]
 }

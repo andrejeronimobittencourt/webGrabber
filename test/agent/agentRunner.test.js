@@ -2,6 +2,7 @@ import test from 'node:test'
 import assert from 'node:assert'
 import AgentRunner from '../../src/agent/AgentRunner.js'
 import AgentPolicy from '../../src/agent/AgentPolicy.js'
+import GrabCatalog from '../../packages/core/grabCatalog.js'
 import CliPresenter from '../../src/infrastructure/presenter/CliPresenter.js'
 import { setPresenter } from '../../src/infrastructure/presenter/present.js'
 
@@ -114,6 +115,9 @@ function createMockEngine() {
 
 	return {
 		async init() {},
+		listImportableCustomActions() {
+			return []
+		},
 		createBrain() {
 			return {
 				browser: { activePage: page, pages: {} },
@@ -137,9 +141,18 @@ function createMockEngine() {
 	}
 }
 
-test('AgentRunner returns final answer after tool execution', async () => {
-	const runner = new AgentRunner({
+const mockLoadGrabCatalog = async () => new GrabCatalog([])
+
+function createRunnerOptions(overrides = {}) {
+	return {
 		engine: createMockEngine(),
+		loadGrabCatalog: mockLoadGrabCatalog,
+		...overrides,
+	}
+}
+
+test('AgentRunner returns final answer after tool execution', async () => {
+	const runner = new AgentRunner(createRunnerOptions({
 		policy: new AgentPolicy({ maxSteps: 5 }),
 		client: new MockOllamaClient([
 			{
@@ -164,7 +177,7 @@ test('AgentRunner returns final answer after tool execution', async () => {
 				},
 			},
 		]),
-	})
+	}))
 
 	const result = await runner.run('Get the h1 text')
 
@@ -175,17 +188,15 @@ test('AgentRunner returns final answer after tool execution', async () => {
 })
 
 test('AgentRunner rejects empty instruction', async () => {
-	const runner = new AgentRunner({
-		engine: createMockEngine(),
+	const runner = new AgentRunner(createRunnerOptions({
 		client: new MockOllamaClient([]),
-	})
+	}))
 
 	await assert.rejects(() => runner.run('   '), /Agent instruction is required/)
 })
 
 test('AgentRunner feeds tool errors back to the model and continues', async () => {
-	const runner = new AgentRunner({
-		engine: createMockEngine(),
+	const runner = new AgentRunner(createRunnerOptions({
 		policy: new AgentPolicy({ maxSteps: 5 }),
 		client: new MockOllamaClient([
 			{
@@ -210,7 +221,7 @@ test('AgentRunner feeds tool errors back to the model and continues', async () =
 				},
 			},
 		]),
-	})
+	}))
 
 	const result = await runner.run('Try and recover')
 
@@ -253,7 +264,7 @@ test('AgentRunner feeds cheatsheet validation errors back to the model and conti
 		async perform() {},
 	})
 
-	const runner = new AgentRunner({
+	const runner = new AgentRunner(createRunnerOptions({
 		engine,
 		policy: new AgentPolicy({ maxSteps: 5 }),
 		client: new MockOllamaClient([
@@ -281,7 +292,7 @@ test('AgentRunner feeds cheatsheet validation errors back to the model and conti
 				},
 			},
 		]),
-	})
+	}))
 
 	const result = await runner.run('Search and read the first result')
 
@@ -325,7 +336,7 @@ test('AgentRunner logs sanitized tool errors without selectors', async () => {
 		async perform() {},
 	})
 
-	const runner = new AgentRunner({
+	const runner = new AgentRunner(createRunnerOptions({
 		engine,
 		policy: new AgentPolicy({ maxSteps: 5 }),
 		client: new MockOllamaClient([
@@ -353,7 +364,7 @@ test('AgentRunner logs sanitized tool errors without selectors', async () => {
 				},
 			},
 		]),
-	})
+	}))
 
 	setPresenter(new CliPresenter())
 	const originalLog = console.log
@@ -398,7 +409,7 @@ test('AgentRunner executes switchTab as an agent-native tool', async () => {
 			async perform() {},
 		})
 
-		const runner = new AgentRunner({
+		const runner = new AgentRunner(createRunnerOptions({
 			engine,
 			policy: new AgentPolicy({ maxSteps: 5 }),
 			client: new MockOllamaClient([
@@ -424,7 +435,7 @@ test('AgentRunner executes switchTab as an agent-native tool', async () => {
 					},
 				},
 			]),
-		})
+		}))
 
 		const result = await runner.run('Switch back to search')
 
@@ -489,11 +500,11 @@ test('AgentRunner skips page vision before first navigate', async () => {
 			}
 		}
 
-		const runner = new AgentRunner({
+		const runner = new AgentRunner(createRunnerOptions({
 			engine,
 			policy: new AgentPolicy({ maxSteps: 5 }),
 			client,
-		})
+		}))
 
 		await runner.run('Go to example.com')
 
@@ -512,8 +523,7 @@ test('AgentRunner executes listElements as an agent-native tool', async () => {
 	process.env.AGENT_VISION = 'false'
 
 	try {
-		const runner = new AgentRunner({
-			engine: createMockEngine(),
+		const runner = new AgentRunner(createRunnerOptions({
 			policy: new AgentPolicy({ maxSteps: 5 }),
 			client: new MockOllamaClient([
 				{
@@ -538,7 +548,7 @@ test('AgentRunner executes listElements as an agent-native tool', async () => {
 					},
 				},
 			]),
-		})
+		}))
 
 		const result = await runner.run('Find item on page 2')
 

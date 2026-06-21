@@ -27,18 +27,39 @@ function logActionRegistryEvent(brain, level, message, meta) {
 class Action {
 	#action
 	#serverBlocked
+	#importable
+	#description
+	#parameters
 
 	/**
 	 * @param {Function} action
-	 * @param {{ serverBlocked?: boolean }} [options]
+	 * @param {{ serverBlocked?: boolean, importable?: boolean, description?: string, parameters?: object }} [options]
 	 */
-	constructor(action, { serverBlocked = false } = {}) {
+	constructor(
+		action,
+		{ serverBlocked = false, importable = false, description, parameters } = {},
+	) {
 		this.#action = action
 		this.#serverBlocked = serverBlocked
+		this.#importable = importable
+		this.#description = description
+		this.#parameters = parameters
 	}
 
 	get serverBlocked() {
 		return this.#serverBlocked
+	}
+
+	get importable() {
+		return this.#importable
+	}
+
+	get description() {
+		return this.#description
+	}
+
+	get parameters() {
+		return this.#parameters
 	}
 
 	async run(brain, page) {
@@ -56,11 +77,33 @@ export class ActionList {
 	/**
 	 * @param {string} name
 	 * @param {Function} action
-	 * @param {{ serverBlocked?: boolean }} [options]
+	 * @param {{ serverBlocked?: boolean, importable?: boolean, description?: string, parameters?: object }} [options]
 	 */
 	add(name, action, options = {}) {
 		if (this.#list.has(name)) throw new Error(`Action ${name} already exists`)
 		this.#list.set(name, new Action(action, options))
+	}
+
+	/**
+	 * @returns {Array<{ name: string, description?: string, parameters?: object }>}
+	 */
+	listImportable() {
+		/** @type {Array<{ name: string, description?: string, parameters?: object }>} */
+		const entries = []
+
+		for (const [name, action] of this.#list.entries()) {
+			if (!action.importable) {
+				continue
+			}
+
+			entries.push({
+				name,
+				description: action.description,
+				parameters: action.parameters,
+			})
+		}
+
+		return entries
 	}
 
 	has(name) {

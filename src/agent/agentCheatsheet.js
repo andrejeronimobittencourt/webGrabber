@@ -59,7 +59,8 @@ export const AGENT_CHEATSHEET_SYSTEM_GUIDANCE =
 	'and hasMore. Only page 0 is shown automatically. Use inspectElement for visual confirmation of a target. ' +
 	'Use pressKey with Enter to submit search or forms when needed instead of clicking submit buttons when possible. ' +
 	'After submitting a search, read the next observation on the active tab; results may open in a new tab listed in tabs—use switchTab if needed, then listVisibleElements or listElements to locate answer text before getElements. Never guess result link selectors. ' +
-	'Each observation includes tabs with tabKey values for every open browser tab. If a click opens the wrong page, an ad, or a popup, use switchTab to return to a previous tab or listTabs to inspect all open tabs before continuing.'
+	'Each observation includes tabs with tabKey values for every open browser tab. If a click opens the wrong page, an ad, or a popup, use switchTab to return to a previous tab or listTabs to inspect all open tabs before continuing. ' +
+	'When importable grab or custom tools are available and match the task, prefer them over manual selector steps. Pass only declared parameter keys. After any grab or custom tool call, read the next observation before continuing with selectors.'
 
 /**
  * @param {Set<string>} knownSelectors

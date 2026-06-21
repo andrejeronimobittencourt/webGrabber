@@ -14,6 +14,26 @@ export default (grabber) => {
 };
 ```
 
+Set `importable: true` to make a custom action available in agent mode:
+
+```javascript
+grabber.addCustomAction(
+  'fetchToken',
+  async (brain, page) => {
+    brain.learn('INPUT', 'token-value');
+  },
+  {
+    importable: true,
+    description: 'Fetch an API token from the current session',
+    parameters: {
+      type: 'object',
+      properties: {},
+      additionalProperties: false,
+    },
+  },
+);
+```
+
 ## Use it in a grab
 
 ```json

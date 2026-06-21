@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert'
 import { buildAgentTools, listAgentToolNames } from '../../src/agent/ToolSchemaBuilder.js'
+import { BUILTIN_AGENT_TOOL_NAMES } from '../../packages/core/utils/builtinAgentToolNames.js'
 
 test('buildAgentTools returns OpenAI-compatible tool definitions', () => {
 	const tools = buildAgentTools()
@@ -17,12 +18,8 @@ test('buildAgentTools returns OpenAI-compatible tool definitions', () => {
 test('listAgentToolNames includes navigate and blocks raw puppeteer', () => {
 	const names = listAgentToolNames()
 
+	assert.deepStrictEqual([...names].sort(), [...BUILTIN_AGENT_TOOL_NAMES].sort())
 	assert.ok(names.includes('navigate'))
-	assert.ok(names.includes('getElements'))
-	assert.ok(names.includes('listElements'))
-	assert.ok(names.includes('listVisibleElements'))
-	assert.ok(names.includes('inspectElement'))
-	assert.ok(names.includes('pressKey'))
 	assert.ok(!names.includes('puppeteer'))
 	assert.ok(!names.includes('login'))
 })

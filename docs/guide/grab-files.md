@@ -8,7 +8,9 @@ A grab file should be stored inside the `grabs/` directory. Root properties:
 
 - `name` *(string, required)*: Unique identifier (letters, numbers, hyphens, underscores).
 - `description` *(string, optional)*: Shown by `npm run help`.
-- `verbose` *(integer, optional)*: CLI output level. Default `1`. Use `0` to silence engine output; `log` actions still print. Ignored in server mode.
+- `importable` *(boolean, optional)*: Default `false`. When `true`, the grab can be called from other grabs with `runGrab` and used as an agent tool.
+- `parameters` *(object, optional)*: Input definitions for importable grabs. Values passed via `runGrab` or agent tools are available as <code v-pre>{{paramName}}</code> inside the grab.
+- `verbose` *(integer, optional)*: CLI output level. Default `1`. Use `0` to silence step output; `log` actions still print. Ignored in server mode.
 - `actions` *(array, required)*: Sequential steps to execute.
 
 ### JSON Syntax
@@ -40,19 +42,19 @@ A grab file should be stored inside the `grabs/` directory. Root properties:
 
 ## Grab Output Directory
 
-When a grab runs, the engine automatically calls `setBaseDir` using the grab's `name`. All filesystem actions resolve relative to:
+Each grab writes files under:
 
 ```
 output/<grab-name>/
 ```
 
-For example, a grab named `example-test` writes files under `output/example-test/`.
+For example, a grab named `example-test` saves under `output/example-test/`. Filesystem actions use paths relative to that folder.
 
 Place your grab configs in `grabs/` at the project root; generated artifacts land in `output/`, keeping source and run results separate.
 
 ### Context Passing & Memory Interpolation
 
-webGrabber introduces **memory interpolation**, allowing dynamic runtime bindings. Env variables starting with `GRABBER_` are automatically flushed into memory. Additionally, in-flight action outputs and set variables can be referenced seamlessly.
+webGrabber supports **memory interpolation**, so you can bind dynamic values into action parameters. Environment variables starting with `GRABBER_` are loaded at run start. Action outputs and variables you set can be referenced the same way.
 
 #### Syntax Rule: <code v-pre>{{variableName}}</code>
 
@@ -97,3 +99,40 @@ Store values with `setVariable`, `getVariable`, and related actions. Reference t
 - **`INPUT`**: The pipe variable. Actions that return a result (e.g. `getElements`, `readFromText`) write their output here. It is overwritten each step — use it in the very next action if you need that value.
 
 Avoid using `INPUT` as a long-lived variable name in `setVariable`; reserve it for step-to-step piping.
+
+## Importable grabs and composition
+
+By default, grabs are meant to be run directly from the CLI or server. Set `importable: true` to reuse a grab inside another grab or from agent mode:
+
+```yaml
+name: login-flow
+description: Logs into the portal
+importable: true
+parameters:
+  type: object
+  properties:
+    username:
+      type: string
+  required: [username]
+  additionalProperties: false
+actions:
+  - name: log
+    params:
+      message: "Signing in as {{username}}"
+```
+
+Call it from another grab with the `runGrab` action:
+
+```json
+{
+  "name": "runGrab",
+  "params": {
+    "grab": "login-flow",
+    "params": {
+      "username": "{{PORTAL_USER}}"
+    }
+  }
+}
+```
+
+Importable grabs also appear as agent tools in [Agent Mode](./agent-mode.md).

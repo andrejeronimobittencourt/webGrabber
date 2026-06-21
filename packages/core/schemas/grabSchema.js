@@ -1,21 +1,37 @@
 import { z } from 'zod'
 import './actionSchemas.js'
 import { getActionNodeSchema } from './refineAction.js'
+import { grabParametersSchema } from './grabParametersSchema.js'
 
 const actionSchema = getActionNodeSchema()
 
 /**
  * Grab configuration schema
  */
-export const grabSchema = z.object({
-	name: z
-		.string()
-		.min(1, 'Grab name is required')
-		.regex(/^[a-zA-Z0-9-_]+$/, 'Grab name must contain only letters, numbers, hyphens, and underscores'),
-	description: z.string().optional(),
-	verbose: z.number().int().min(0).default(1),
-	actions: z.array(actionSchema).min(1, 'At least one action is required'),
-})
+export const grabSchema = z
+	.object({
+		name: z
+			.string()
+			.min(1, 'Grab name is required')
+			.regex(
+				/^[a-zA-Z0-9-_]+$/,
+				'Grab name must contain only letters, numbers, hyphens, and underscores',
+			),
+		description: z.string().optional(),
+		importable: z.boolean().optional().default(false),
+		parameters: grabParametersSchema,
+		verbose: z.number().int().min(0).default(1),
+		actions: z.array(actionSchema).min(1, 'At least one action is required'),
+	})
+	.superRefine((grab, ctx) => {
+		if (grab.parameters && !grab.importable) {
+			ctx.addIssue({
+				code: z.ZodIssueCode.custom,
+				message: 'parameters requires importable: true',
+				path: ['parameters'],
+			})
+		}
+	})
 
 /**
  * Helper to format Zod errors for better readability
