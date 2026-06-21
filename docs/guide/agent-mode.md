@@ -1,4 +1,4 @@
-# Agent Mode (Ollama)
+# Agent Mode
 
 **webGrabber** can run browser tasks from natural-language instructions using a local [Ollama](https://ollama.com/) model. Use agent mode for one-off or exploratory work; use [Grab Files](./grab-files.md) when you need repeatable JSON/YAML flows.
 
@@ -39,7 +39,7 @@ Write instructions as you would ask a person: where to go, what to search or cli
 
 ## Configuration
 
-Agent settings use the `AGENT_*` prefix. Do **not** use `GRABBER_*` for these — `GRABBER_*` variables are loaded into grab script memory at runtime.
+Agent settings use the `AGENT_*` prefix.
 
 | Variable | Default | Description |
 |----------|---------|-------------|
@@ -75,10 +75,6 @@ Inline override:
 ```bash
 AGENT_ALLOWED_HOSTS=example.com npm run start:agent "Summarize example.com"
 ```
-
-::: tip
-`app.js` loads `.env` automatically (`dotenv`). Prefer `.env` for persistent agent settings.
-:::
 
 ## Agent Mode vs Grabs
 

@@ -24,11 +24,13 @@ features:
   - title: Declarative Grabs
     details: Author scraping or automation workflows as simple JSON or YAML files in `grabs/`.
   - title: Reusable Actions
-    details: Chain robust built-in actions for navigation, extraction, and filesystem interactions.
+    details: Chain built-in actions for navigation, extraction, and filesystem interactions.
   - title: Powerful Interpolation
     details: Inject runtime environment variables dynamically with the <code v-pre>{{variable}}</code> syntax.
-  - title: Headless Server Mode 
-    details: Run on a lightweight HTTP server to execute HTTP `POST /grab` triggers on demand.
-  - title: Agent Mode (Ollama)
-    details: Run browser tasks from natural-language instructions with a local Ollama model.
+  - title: Headless Server Mode
+    details: Run on a lightweight HTTP server and trigger workflows with `POST /grab`.
+  - title: Agent Mode
+    details: Run browser tasks from natural-language instructions.
+  - title: Custom Actions
+    details: Extend the engine with your own JavaScript actions when built-ins are not enough.
 ---

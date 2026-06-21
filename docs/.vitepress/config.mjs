@@ -23,7 +23,7 @@ export default defineConfig({
         items: [
           { text: 'Puppeteer Configuration', link: '/guide/puppeteer' },
           { text: 'Server Mode', link: '/guide/server-mode' },
-          { text: 'Agent Mode (Ollama)', link: '/guide/agent-mode' }
+          { text: 'Agent Mode', link: '/guide/agent-mode' }
         ]
       },
       {
