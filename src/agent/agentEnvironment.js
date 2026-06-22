@@ -20,13 +20,13 @@ export function buildVisionConstraint(visionAvailable) {
 }
 
 /** Hard constraints stated once in the agent system prompt. */
-const AGENT_SYSTEM_CONSTRAINTS =
-	'You control a headless browser through tools. The user cannot see the browser. ' +
-	'Finish by replying with plain text only (no tool calls). ' +
-	'Only use tools from the provided tool list. ' +
-	'Tool history lists prior tool names and params only — not their results. Check lastResult in the observation for the most recent tool output. ' +
-	'elements is the only allowed source of selectors: each item has selector and text. Copy selector exactly; do not invent or modify selectors. ' +
-	'click, type, getElements, and inspectElement always require selector from the current elements list. Text labels are not selectors. ' +
+const SELECTOR_REQUIRED_TOOLS_BASE =
+	'click, type, and getElements always require selector from the current elements list. Text labels are not selectors. '
+
+const SELECTOR_REQUIRED_TOOLS_WITH_VISION =
+	'click, type, getElements, and inspectElement always require selector from the current elements list. Text labels are not selectors. '
+
+const AGENT_SYSTEM_CONSTRAINTS_TAIL =
 	'When elementsPage.hasMore is true, call paginateElements with nextOffset to load more elements. ' +
 	'Do not call paginateElements when elementsPage.hasMore is false. ' +
 	'Answer from element text when it already contains the information; use getElements only for attributes or text not shown in elements. ' +
@@ -38,14 +38,27 @@ const EXPORT_AGENT_SYSTEM_CONSTRAINTS =
 
 /**
  * @param {boolean} exportMode
+ * @param {boolean} [visionAvailable=false]
  * @returns {string}
  */
-export function buildAgentSystemConstraints(exportMode = false) {
+export function buildAgentSystemConstraints(exportMode = false, visionAvailable = false) {
+	const selectorConstraint = visionAvailable
+		? SELECTOR_REQUIRED_TOOLS_WITH_VISION
+		: SELECTOR_REQUIRED_TOOLS_BASE
+	const constraints =
+		'You control a headless browser through tools. The user cannot see the browser. ' +
+		'Finish by replying with plain text only (no tool calls). ' +
+		'Only use tools from the provided tool list. ' +
+		'Tool history lists prior tool names and params only — not their results. Check lastResult in the observation for the most recent tool output. ' +
+		'elements is the only allowed source of selectors: each item has selector and text. Copy selector exactly; do not invent or modify selectors. ' +
+		selectorConstraint +
+		AGENT_SYSTEM_CONSTRAINTS_TAIL
+
 	if (!exportMode) {
-		return AGENT_SYSTEM_CONSTRAINTS
+		return constraints
 	}
 
-	return `${AGENT_SYSTEM_CONSTRAINTS} ${EXPORT_AGENT_SYSTEM_CONSTRAINTS}`
+	return `${constraints} ${EXPORT_AGENT_SYSTEM_CONSTRAINTS}`
 }
 
 /**
@@ -68,7 +81,7 @@ export function buildAgentSystemPrompt(
 ) {
 	return (
 		`You are a browser automation agent. Today's date is ${formatAgentRunDate(referenceDate)}. ` +
-		`${buildAgentSystemConstraints(exportMode)} ${buildVisionConstraint(visionAvailable)}`
+		`${buildAgentSystemConstraints(exportMode, visionAvailable)} ${buildVisionConstraint(visionAvailable)}`
 	)
 }
 

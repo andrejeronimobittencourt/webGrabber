@@ -4,6 +4,7 @@ import { buildAgentTools, listAgentToolNames } from '../../src/agent/ToolSchemaB
 import {
 	BUILTIN_AGENT_TOOL_NAMES,
 	EXPORT_AGENT_TOOL_NAMES,
+	VISION_AGENT_TOOL_NAMES,
 } from '../../packages/core/utils/builtinAgentToolNames.js'
 
 test('buildAgentTools returns OpenAI-compatible tool definitions', () => {
@@ -26,6 +27,17 @@ test('listAgentToolNames includes navigate and blocks raw puppeteer', () => {
 	assert.ok(!names.includes('puppeteer'))
 	assert.ok(!names.includes('login'))
 	assert.ok(!names.includes('pickElement'))
+	assert.ok(!names.includes('inspectElement'))
+})
+
+test('listAgentToolNames includes inspectElement only when vision is available', () => {
+	const names = listAgentToolNames({ visionAvailable: true })
+
+	assert.ok(names.includes('inspectElement'))
+	assert.deepStrictEqual(
+		[...names].sort(),
+		[...BUILTIN_AGENT_TOOL_NAMES, ...VISION_AGENT_TOOL_NAMES].sort(),
+	)
 })
 
 test('listAgentToolNames includes pickElement only during export', () => {
@@ -76,21 +88,21 @@ test('buildAgentTools includes pickElement only during export', () => {
 	assert.strictEqual(buildAgentTools().some((tool) => tool.function.name === 'pickElement'), false)
 })
 
-test('buildAgentTools describes screenshot as user-only when vision is disabled', () => {
+test('buildAgentTools omits inspectElement when vision is disabled', () => {
 	const tools = buildAgentTools({ visionAvailable: false })
 	const screenshot = tools.find((tool) => tool.function.name === 'screenshot')
-	const inspectElement = tools.find((tool) => tool.function.name === 'inspectElement')
 
+	assert.strictEqual(tools.some((tool) => tool.function.name === 'inspectElement'), false)
 	assert.match(screenshot.function.description, /for the user only/)
 	assert.match(screenshot.function.description, /cannot see/)
-	assert.match(inspectElement.function.description, /Vision is not enabled/)
 })
 
-test('buildAgentTools updates vision tool descriptions when vision is enabled', () => {
+test('buildAgentTools includes inspectElement when vision is enabled', () => {
 	const tools = buildAgentTools({ visionAvailable: true })
 	const screenshot = tools.find((tool) => tool.function.name === 'screenshot')
 	const inspectElement = tools.find((tool) => tool.function.name === 'inspectElement')
 
-	assert.match(screenshot.function.description, /for the user/)
+	assert.ok(inspectElement)
 	assert.match(inspectElement.function.description, /vision summary/)
+	assert.match(screenshot.function.description, /for the user/)
 })

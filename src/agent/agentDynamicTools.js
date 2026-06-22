@@ -2,6 +2,7 @@ import constants from '../../packages/core/utils/constants.js'
 import { executeGrab } from '../../packages/core/grabExecution.js'
 import { resolveGrabParameterSchema, validateGrabParameters } from '../../packages/core/grabParameters.js'
 import {
+	AGENT_RESERVED_TOOL_NAMES,
 	BUILTIN_AGENT_TOOL_NAMES,
 	EXPORT_AGENT_TOOL_NAMES,
 } from '../../packages/core/utils/builtinAgentToolNames.js'
@@ -11,7 +12,7 @@ import {
  * @returns {boolean}
  */
 function isReservedAgentToolName(toolName) {
-	return BUILTIN_AGENT_TOOL_NAMES.includes(toolName) || EXPORT_AGENT_TOOL_NAMES.includes(toolName)
+	return AGENT_RESERVED_TOOL_NAMES.includes(toolName)
 }
 
 /**

@@ -5,7 +5,7 @@ import CoreActionList from './actions/CoreActionList.js'
 import CustomActionList from './actions/CustomActionList.js'
 import { present } from './infrastructure/presenter/present.js'
 import constants from './utils/constants.js'
-import { BUILTIN_AGENT_TOOL_NAMES } from './utils/builtinAgentToolNames.js'
+import { AGENT_RESERVED_TOOL_NAMES } from './utils/builtinAgentToolNames.js'
 
 /**
  * Shared browser automation engine bootstrap used by Grabber and AgentRunner.
@@ -32,7 +32,7 @@ export default class Engine {
 			throw new Error(`Action ${name} already exists`)
 		}
 
-		if (options.importable && BUILTIN_AGENT_TOOL_NAMES.includes(name)) {
+		if (options.importable && AGENT_RESERVED_TOOL_NAMES.includes(name)) {
 			throw new Error(`Action ${name} collides with a built-in agent tool`)
 		}
 

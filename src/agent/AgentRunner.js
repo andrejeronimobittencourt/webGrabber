@@ -127,9 +127,15 @@ export default class AgentRunner {
 		})
 		const dynamicToolNames = new Set(dynamicRegistry.keys())
 		const exportMode = Boolean(exportGrabName)
+		const visionAvailable = isAgentVisionAvailable(this.#client)
 		const policy =
 			this.#policyOptions.policy ??
-			new AgentPolicy({ ...this.#policyOptions, dynamicRegistry, exportMode })
+			new AgentPolicy({
+				...this.#policyOptions,
+				dynamicRegistry,
+				exportMode,
+				visionAvailable,
+			})
 
 		const brain = this.#engine.createBrain()
 		brain.run.agentMode = true
@@ -139,7 +145,6 @@ export default class AgentRunner {
 		brain.run.pickedSelector = null
 		/** @type {AgentRunResult['steps']} */
 		const steps = []
-		const visionAvailable = isAgentVisionAvailable(this.#client)
 		const tools = buildAgentTools({ dynamicTools, visionAvailable, exportMode })
 		/** @type {string[]} */
 		let pendingFeedback = []

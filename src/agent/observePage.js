@@ -1,4 +1,5 @@
 import constants from '../../packages/core/utils/constants.js'
+import { delayMs } from '../../packages/core/utils/delayMs.js'
 import { SelectorError } from '../../packages/core/errors/ActionErrors.js'
 import { isVisionEnabled } from './agentModels.js'
 import { isObservationCacheEnabled, resolveElementOffset, resolveElementPageSize } from './agentConfig.js'
@@ -316,7 +317,7 @@ export async function inspectElement(page, client, params) {
 		element.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' })
 	}, selector)
 
-	await page.waitForTimeout(300)
+	await delayMs(300)
 
 	const elementMeta = await page.evaluate((elementSelector) => {
 		const element = document.querySelector(elementSelector)

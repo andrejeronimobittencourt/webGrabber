@@ -19,6 +19,7 @@ test('buildAgentSystemPrompt includes the run date and environment constraints',
 	assert.match(prompt, /The user cannot see the browser/)
 	assert.match(prompt, /Only use tools from the provided tool list/)
 	assert.match(prompt, /elements is the only allowed source of selectors/)
+	assert.doesNotMatch(prompt, /inspectElement/)
 	assert.match(prompt, /did not change the observation twice/)
 	assert.match(prompt, /hasMore is false/)
 	assert.doesNotMatch(prompt, /pickElement is required/)
@@ -36,6 +37,7 @@ test('buildAgentSystemPrompt states vision capability when available', () => {
 
 	assert.match(prompt, /Vision is enabled/)
 	assert.match(prompt, /visualSummary/)
+	assert.match(prompt, /inspectElement/)
 })
 
 test('buildVisionConstraint returns unavailable messaging by default', () => {

@@ -3,6 +3,7 @@ import { DEFAULT_AGENT_ELEMENT_PAGE_SIZE } from './agentConfig.js'
 import {
 	BUILTIN_AGENT_TOOL_NAMES,
 	EXPORT_AGENT_TOOL_NAMES,
+	VISION_AGENT_TOOL_NAMES,
 } from '../../packages/core/utils/builtinAgentToolNames.js'
 
 /**
@@ -92,22 +93,6 @@ const AGENT_TOOL_DEFINITIONS = [
 					},
 				},
 				required: [],
-				additionalProperties: false,
-			},
-		},
-	},
-	{
-		type: 'function',
-		function: {
-			name: 'inspectElement',
-			description:
-				'Scroll an element into view and return its text. Vision is not enabled—no image summary.',
-			parameters: {
-				type: 'object',
-				properties: {
-					selector: SELECTOR_PARAM,
-				},
-				required: ['selector'],
 				additionalProperties: false,
 			},
 		},
@@ -220,6 +205,24 @@ const AGENT_TOOL_DEFINITIONS = [
 ]
 
 /** @type {AgentToolDefinition} */
+const INSPECT_ELEMENT_TOOL_DEFINITION = {
+	type: 'function',
+	function: {
+		name: 'inspectElement',
+		description:
+			'Scroll an element into view and return its text plus a vision summary of the element.',
+		parameters: {
+			type: 'object',
+			properties: {
+				selector: SELECTOR_PARAM,
+			},
+			required: ['selector'],
+			additionalProperties: false,
+		},
+	},
+}
+
+/** @type {AgentToolDefinition} */
 const PICK_ELEMENT_TOOL_DEFINITION = {
 	type: 'function',
 	function: {
@@ -238,8 +241,6 @@ const PICK_ELEMENT_TOOL_DEFINITION = {
 }
 
 const VISION_TOOL_DESCRIPTIONS = {
-	inspectElement:
-		'Scroll an element into view and return its text plus a vision summary of the element.',
 	screenshot:
 		'Save a screenshot file for the user. Does not update your observation—read elements instead.',
 }
@@ -254,9 +255,11 @@ export function buildAgentTools({
 	visionAvailable = false,
 	exportMode = false,
 } = {}) {
-	const baseTools = exportMode
-		? [...AGENT_TOOL_DEFINITIONS, PICK_ELEMENT_TOOL_DEFINITION]
-		: AGENT_TOOL_DEFINITIONS
+	const baseTools = [
+		...AGENT_TOOL_DEFINITIONS,
+		...(visionAvailable ? [INSPECT_ELEMENT_TOOL_DEFINITION] : []),
+		...(exportMode ? [PICK_ELEMENT_TOOL_DEFINITION] : []),
+	]
 
 	return [...baseTools, ...dynamicTools].map((tool) => {
 		const description =
@@ -276,12 +279,17 @@ export function buildAgentTools({
 }
 
 /**
- * @param {{ dynamicTools?: AgentToolDefinition[], exportMode?: boolean }} [options]
+ * @param {{ dynamicTools?: AgentToolDefinition[], exportMode?: boolean, visionAvailable?: boolean }} [options]
  * @returns {string[]}
  */
-export function listAgentToolNames({ dynamicTools = [], exportMode = false } = {}) {
+export function listAgentToolNames({
+	dynamicTools = [],
+	exportMode = false,
+	visionAvailable = false,
+} = {}) {
 	return [
 		...BUILTIN_AGENT_TOOL_NAMES,
+		...(visionAvailable ? VISION_AGENT_TOOL_NAMES : []),
 		...(exportMode ? EXPORT_AGENT_TOOL_NAMES : []),
 		...dynamicTools.map((tool) => tool.function.name),
 	]

@@ -2,7 +2,7 @@ import { SELECTOR_NOT_IN_OBSERVATION } from './agentEnvironment.js'
 import { AgentValidationError } from './agentErrors.js'
 import { findElementsByText } from './agentObservationFormat.js'
 import { validateGrabParameters } from '../../packages/core/grabParameters.js'
-import { BUILTIN_AGENT_TOOL_NAMES, EXPORT_AGENT_TOOL_NAMES } from '../../packages/core/utils/builtinAgentToolNames.js'
+import { BUILTIN_AGENT_TOOL_NAMES, EXPORT_AGENT_TOOL_NAMES, VISION_AGENT_TOOL_NAMES } from '../../packages/core/utils/builtinAgentToolNames.js'
 
 /**
  * @typedef {import('./agentDynamicTools.js').DynamicToolRegistryEntry} DynamicToolRegistryEntry
@@ -31,9 +31,10 @@ export default class AgentPolicy {
 	#allowedHosts
 	#dynamicRegistry
 	#exportMode
+	#visionAvailable
 
 	/**
-	 * @param {{ maxSteps?: number, allowedHosts?: string[], dynamicRegistry?: Map<string, DynamicToolRegistryEntry>, exportMode?: boolean }} [options]
+	 * @param {{ maxSteps?: number, allowedHosts?: string[], dynamicRegistry?: Map<string, DynamicToolRegistryEntry>, exportMode?: boolean, visionAvailable?: boolean }} [options]
 	 */
 	constructor(options = {}) {
 		this.#maxSteps =
@@ -46,6 +47,7 @@ export default class AgentPolicy {
 				.filter(Boolean)
 		this.#dynamicRegistry = options.dynamicRegistry ?? new Map()
 		this.#exportMode = options.exportMode ?? false
+		this.#visionAvailable = options.visionAvailable ?? false
 	}
 
 	get maxSteps() {
@@ -62,6 +64,7 @@ export default class AgentPolicy {
 	listAllowedToolNames() {
 		return [
 			...BUILTIN_AGENT_TOOL_NAMES,
+			...(this.#visionAvailable ? VISION_AGENT_TOOL_NAMES : []),
 			...(this.#exportMode ? EXPORT_AGENT_TOOL_NAMES : []),
 			...this.#dynamicRegistry.keys(),
 		]
@@ -74,6 +77,7 @@ export default class AgentPolicy {
 	isAllowedAction(name) {
 		return (
 			BUILTIN_AGENT_TOOL_NAMES.includes(name) ||
+			(this.#visionAvailable && VISION_AGENT_TOOL_NAMES.includes(name)) ||
 			(this.#exportMode && EXPORT_AGENT_TOOL_NAMES.includes(name)) ||
 			this.#dynamicRegistry.has(name)
 		)

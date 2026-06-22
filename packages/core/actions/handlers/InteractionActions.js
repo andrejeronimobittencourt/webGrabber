@@ -5,6 +5,7 @@ import { FileSystem } from '../../utils/FileSystem.js'
 import { SelectorError, NetworkError } from '../../errors/ActionErrors.js'
 import { retryWithBackoff, isRetryableError } from '../../utils/retry.js'
 import { safePageUrl } from '../../utils/safePageUrl.js'
+import { delayMs } from '../../utils/delayMs.js'
 
 const WAITUNTIL = 'networkidle0'
 
@@ -99,7 +100,7 @@ export default class InteractionActions {
 				const element = document.querySelector(selector)
 				element.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' })
 			}, selector)
-			await page.waitForTimeout(ms)
+			await delayMs(ms)
 			await page.click(selector)
 		})
 		actionList.add('type', async (brain, page) => {
