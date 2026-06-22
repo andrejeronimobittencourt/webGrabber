@@ -82,7 +82,7 @@ export default class AgentPolicy {
 	/**
 	 * @param {string} name
 	 * @param {Record<string, unknown>} params
-	 * @param {{ currentUrl?: string, knownSelectors?: Set<string>, elements?: import('./observePage.js').PageElement[] }} [context]
+	 * @param {{ currentUrl?: string, knownSelectors?: Set<string>, elements?: import('./observePage.js').PageElement[], elementsPage?: { hasMore?: boolean } }} [context]
 	 */
 	validateAction(name, params, context = {}) {
 		const dynamicEntry = this.#dynamicRegistry.get(name)
@@ -101,7 +101,11 @@ export default class AgentPolicy {
 		}
 
 		if (name === 'switchTab' && typeof params.tabKey !== 'string') {
-			throw new Error('switchTab requires a tabKey string')
+			throw AgentValidationError.invalidParams('switchTab', 'tabKey string is required')
+		}
+
+		if (name === 'paginateElements' && context.elementsPage?.hasMore === false) {
+			throw AgentValidationError.paginationExhausted()
 		}
 
 		if (REQUIRED_SELECTOR_ACTIONS.has(name)) {
@@ -112,7 +116,11 @@ export default class AgentPolicy {
 			(name === 'pickElement' || SELECTOR_ACTIONS.has(name)) &&
 			typeof params.selector === 'string'
 		) {
-			this.validateObservationSelector(params.selector, context.knownSelectors, context.elements ?? [])
+			this.validateObservationSelector(
+				params.selector,
+				context.knownSelectors,
+				context.elements ?? [],
+			)
 		}
 	}
 
@@ -168,7 +176,7 @@ export default class AgentPolicy {
 		)
 
 		if (!allowed) {
-			throw new Error(`Host "${hostname}" is not allowed by AGENT_ALLOWED_HOSTS`)
+			throw AgentValidationError.hostNotAllowed(hostname)
 		}
 	}
 }

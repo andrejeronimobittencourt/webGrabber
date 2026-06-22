@@ -77,7 +77,7 @@ const AGENT_TOOL_DEFINITIONS = [
 		function: {
 			name: 'paginateElements',
 			description:
-				'Change which elements slice appears in the next observation. Use elementsPage.nextOffset when hasMore is true.',
+				'Change which elements slice appears in the next observation. Only when elementsPage.hasMore is true; use elementsPage.nextOffset.',
 			parameters: {
 				type: 'object',
 				properties: {
@@ -249,7 +249,11 @@ const VISION_TOOL_DESCRIPTIONS = {
  * @param {{ dynamicTools?: AgentToolDefinition[], visionAvailable?: boolean, exportMode?: boolean }} [options]
  * @returns {AgentToolDefinition[]}
  */
-export function buildAgentTools({ dynamicTools = [], visionAvailable = false, exportMode = false } = {}) {
+export function buildAgentTools({
+	dynamicTools = [],
+	visionAvailable = false,
+	exportMode = false,
+} = {}) {
 	const baseTools = exportMode
 		? [...AGENT_TOOL_DEFINITIONS, PICK_ELEMENT_TOOL_DEFINITION]
 		: AGENT_TOOL_DEFINITIONS

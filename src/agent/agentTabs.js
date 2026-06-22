@@ -27,7 +27,9 @@ const popupBoundPages = new WeakSet()
 async function tryBringToFront(page) {
 	try {
 		await page.bringToFront()
-	} catch {}
+	} catch {
+		// Page may be closed or detached.
+	}
 }
 
 /**

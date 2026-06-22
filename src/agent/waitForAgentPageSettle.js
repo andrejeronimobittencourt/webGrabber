@@ -40,5 +40,7 @@ export async function waitForAgentPageSettle(page, options = {}) {
 		if (typeof page.waitForNetworkIdle === 'function') {
 			await page.waitForNetworkIdle({ idleTime: 500, timeout: 3_000 })
 		}
-	} catch {}
+	} catch {
+		// Network idle is best-effort; observation still proceeds.
+	}
 }

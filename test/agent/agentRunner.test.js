@@ -509,7 +509,38 @@ test('AgentRunner executes paginateElements as an agent-native tool', async () =
 	process.env.AGENT_VISION = 'false'
 
 	try {
+		const page = new MockPage()
+		page.evaluate = async (_fn, args) => {
+			if (args && typeof args.elementOffset === 'number') {
+				const total = 150
+				const element = {
+					selector: `#item-${args.elementOffset}`,
+					text: `Item ${args.elementOffset}`,
+				}
+
+				return {
+					elements: args.elementOffset >= total ? [] : [element].slice(0, args.elementLimit),
+					total,
+				}
+			}
+
+			return { scrollX: 0, scrollY: 0 }
+		}
+
+		const engine = createMockEngine()
+		engine.createBrain = () => ({
+			browser: { activePage: page, pages: { default: page } },
+			presenter: { verbose: 1, indentation: 0 },
+			run: { params: {}, agentMode: true, elementList: { offset: 0 } },
+			recall: () => null,
+			async perform() {},
+		})
+		engine.bootBrowser = async (brain) => {
+			brain.browser.activePage = page
+		}
+
 		const runner = new AgentRunner(createRunnerOptions({
+			engine,
 			policy: new AgentPolicy({ maxSteps: 5 }),
 			client: new MockOllamaClient([
 				{
@@ -694,6 +725,141 @@ test('AgentRunner allows type without pickElement after navigate', async () => {
 	assert.strictEqual(result.steps[1].action, 'type')
 	assert.strictEqual(result.steps[1].error, null)
 	assert.strictEqual(result.answer, 'Typed the search query.')
+})
+
+test('AgentRunner warns when the same stalled tool call is repeated', async () => {
+	/** @type {import('../../src/agent/OllamaClient.js').OllamaChatMessage[][]} */
+	const recordedMessages = []
+
+	class RecordingOllamaClient extends MockOllamaClient {
+		async chat(messages) {
+			recordedMessages.push(messages)
+			return super.chat(messages)
+		}
+	}
+
+	const runner = new AgentRunner(createRunnerOptions({
+		policy: new AgentPolicy({ maxSteps: 6 }),
+		client: new RecordingOllamaClient([
+			{
+				message: {
+					role: 'assistant',
+					tool_calls: [
+						{
+							id: 'call-1',
+							type: 'function',
+							function: {
+								name: 'click',
+								arguments: JSON.stringify({ selector: 'textarea[name="q"]' }),
+							},
+						},
+					],
+				},
+			},
+			{
+				message: {
+					role: 'assistant',
+					tool_calls: [
+						{
+							id: 'call-2',
+							type: 'function',
+							function: {
+								name: 'click',
+								arguments: JSON.stringify({ selector: 'textarea[name="q"]' }),
+							},
+						},
+					],
+				},
+			},
+			{
+				message: {
+					role: 'assistant',
+					content: 'Stopped repeating the same click.',
+				},
+			},
+		]),
+	}))
+
+	const result = await runner.run('Try the same click twice')
+
+	assert.strictEqual(result.answer, 'Stopped repeating the same click.')
+	assert.strictEqual(result.steps.length, 2)
+	assert.strictEqual(result.steps[0].madeProgress, false)
+	assert.strictEqual(result.steps[1].madeProgress, false)
+
+	const feedbackMessage = recordedMessages[2]?.find((message) =>
+		String(message.content).startsWith('Feedback from last step:'),
+	)
+
+	assert.match(String(feedbackMessage?.content), /same parameters was tried 2 times/)
+	assert.match(String(feedbackMessage?.content), /different tool or different parameters/)
+})
+
+test('AgentRunner warns when paginateElements loops on the same page', async () => {
+	/** @type {import('../../src/agent/OllamaClient.js').OllamaChatMessage[][]} */
+	const recordedMessages = []
+
+	class RecordingOllamaClient extends MockOllamaClient {
+		async chat(messages) {
+			recordedMessages.push(messages)
+			return super.chat(messages)
+		}
+	}
+
+	const page = new MockPage()
+	page.setUrl('https://example.com/search')
+
+	const engine = createMockEngine()
+	engine.createBrain = () => ({
+		browser: { activePage: page, pages: { default: page } },
+		presenter: { verbose: 1, indentation: 0 },
+		run: { params: {}, agentMode: true, elementList: { offset: 0 } },
+		recall: () => null,
+		async perform() {},
+	})
+
+	const paginateCall = (offset) => ({
+		message: {
+			role: 'assistant',
+			tool_calls: [
+				{
+					id: `call-${offset}`,
+					type: 'function',
+					function: {
+						name: 'paginateElements',
+						arguments: JSON.stringify({ offset }),
+					},
+				},
+			],
+		},
+	})
+
+	const runner = new AgentRunner(createRunnerOptions({
+		engine,
+		policy: new AgentPolicy({ maxSteps: 8 }),
+		client: new RecordingOllamaClient([
+			paginateCall(0),
+			paginateCall(25),
+			paginateCall(50),
+			{
+				message: {
+					role: 'assistant',
+					content: 'Stopped paginating.',
+				},
+			},
+		]),
+	}))
+
+	const result = await runner.run('Paginate through results')
+
+	assert.strictEqual(result.answer, 'Stopped paginating.')
+	assert.strictEqual(result.steps.length, 3)
+
+	const feedbackMessage = recordedMessages[3]?.find((message) =>
+		String(message.content).startsWith('Feedback from last step:'),
+	)
+
+	assert.match(String(feedbackMessage?.content), /paginateElements was called 3 times in a row/)
 })
 
 test('AgentRunner retries when the model returns an empty assistant turn', async () => {

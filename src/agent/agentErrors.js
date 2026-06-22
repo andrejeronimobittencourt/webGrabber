@@ -1,5 +1,3 @@
-import { SELECTOR_NOT_IN_OBSERVATION } from './agentEnvironment.js'
-
 /** @typedef {import('./observePage.js').PageElement} PageElement */
 
 /**
@@ -65,6 +63,39 @@ export class AgentValidationError extends Error {
 			`${toolName} requires a selector`,
 			`${toolName} requires selector from the current elements list.${suffix}`,
 			{ suggestedElements },
+		)
+	}
+
+	/**
+	 * @param {string} toolName
+	 * @param {string} detail
+	 * @returns {AgentValidationError}
+	 */
+	static invalidParams(toolName, detail) {
+		return new AgentValidationError(
+			`${toolName} received invalid parameters`,
+			`${toolName}: ${detail}`,
+		)
+	}
+
+	/**
+	 * @param {string} hostname
+	 * @returns {AgentValidationError}
+	 */
+	static hostNotAllowed(hostname) {
+		return new AgentValidationError(
+			`Host "${hostname}" is not allowed`,
+			`Host "${hostname}" is not allowed by AGENT_ALLOWED_HOSTS`,
+		)
+	}
+
+	/**
+	 * @returns {AgentValidationError}
+	 */
+	static paginationExhausted() {
+		return new AgentValidationError(
+			'All elements are already listed',
+			'paginateElements cannot run because elementsPage.hasMore is false. Read the current elements or use another tool.',
 		)
 	}
 

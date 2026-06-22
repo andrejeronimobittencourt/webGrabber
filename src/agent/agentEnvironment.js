@@ -19,7 +19,8 @@ export function buildVisionConstraint(visionAvailable) {
 	return visionAvailable ? VISION_AVAILABLE_CONSTRAINT : VISION_UNAVAILABLE_CONSTRAINT
 }
 
-const AGENT_CAPABILITY_CONTRACT =
+/** Hard constraints stated once in the agent system prompt. */
+const AGENT_SYSTEM_CONSTRAINTS =
 	'You control a headless browser through tools. The user cannot see the browser. ' +
 	'Finish by replying with plain text only (no tool calls). ' +
 	'Only use tools from the provided tool list. ' +
@@ -27,7 +28,10 @@ const AGENT_CAPABILITY_CONTRACT =
 	'elements is the only allowed source of selectors: each item has selector and text. Copy selector exactly; do not invent or modify selectors. ' +
 	'click, type, getElements, and inspectElement always require selector from the current elements list. Text labels are not selectors. ' +
 	'When elementsPage.hasMore is true, call paginateElements with nextOffset to load more elements. ' +
-	'Answer from element text when it already contains the information; use getElements only for attributes or text not shown in elements.'
+	'Do not call paginateElements when elementsPage.hasMore is false. ' +
+	'Answer from element text when it already contains the information; use getElements only for attributes or text not shown in elements. ' +
+	'If the same tool call with identical parameters did not change the observation twice, do not repeat it; try a different tool or parameters. ' +
+	'If you call the same tool repeatedly on one page without navigating, switch to a different tool or approach.'
 
 const EXPORT_AGENT_SYSTEM_CONSTRAINTS =
 	'Export mode: call pickElement with the answer selector before a final reply when getElements was not used.'
@@ -38,10 +42,10 @@ const EXPORT_AGENT_SYSTEM_CONSTRAINTS =
  */
 export function buildAgentSystemConstraints(exportMode = false) {
 	if (!exportMode) {
-		return AGENT_CAPABILITY_CONTRACT
+		return AGENT_SYSTEM_CONSTRAINTS
 	}
 
-	return `${AGENT_CAPABILITY_CONTRACT} ${EXPORT_AGENT_SYSTEM_CONSTRAINTS}`
+	return `${AGENT_SYSTEM_CONSTRAINTS} ${EXPORT_AGENT_SYSTEM_CONSTRAINTS}`
 }
 
 /**
@@ -58,7 +62,10 @@ export function formatAgentRunDate(date) {
  * @param {{ visionAvailable?: boolean, exportMode?: boolean }} [options]
  * @returns {string}
  */
-export function buildAgentSystemPrompt(referenceDate = new Date(), { visionAvailable = false, exportMode = false } = {}) {
+export function buildAgentSystemPrompt(
+	referenceDate = new Date(),
+	{ visionAvailable = false, exportMode = false } = {},
+) {
 	return (
 		`You are a browser automation agent. Today's date is ${formatAgentRunDate(referenceDate)}. ` +
 		`${buildAgentSystemConstraints(exportMode)} ${buildVisionConstraint(visionAvailable)}`

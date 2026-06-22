@@ -19,6 +19,8 @@ test('buildAgentSystemPrompt includes the run date and environment constraints',
 	assert.match(prompt, /The user cannot see the browser/)
 	assert.match(prompt, /Only use tools from the provided tool list/)
 	assert.match(prompt, /elements is the only allowed source of selectors/)
+	assert.match(prompt, /did not change the observation twice/)
+	assert.match(prompt, /hasMore is false/)
 	assert.doesNotMatch(prompt, /pickElement is required/)
 	assert.match(prompt, /Vision is disabled/)
 })

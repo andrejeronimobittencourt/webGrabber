@@ -13,12 +13,10 @@ export const EMPTY_ASSISTANT_NUDGE =
 	'Last response had no tool calls and no answer text.'
 
 /** Prefix for the current-page observation user turn. */
-export const OBSERVATION_MESSAGE_PREFIX =
-	'Current page observation (elements are the only selector source; copy selector exactly):\n'
+export const OBSERVATION_MESSAGE_PREFIX = 'Current page observation:\n'
 
 /** Prefix for the compact tool-call history user turn. */
-export const TOOL_HISTORY_MESSAGE_PREFIX =
-	'Tools called this run (results are not listed — see lastResult in the observation):\n'
+export const TOOL_HISTORY_MESSAGE_PREFIX = 'Tools called this run:\n'
 
 /** Prefix for feedback from the previous model step. */
 export const FEEDBACK_MESSAGE_PREFIX = 'Feedback from last step:\n'

@@ -24,6 +24,18 @@ export const KNOWN_SELECTOR_REFRESH_TOOLS = new Set([
 	'switchTab',
 ])
 
+/** How many consecutive calls of the same tool on one page URL trigger loop feedback. */
+export const CONSECUTIVE_SAME_TOOL_PAGE_THRESHOLD = 3
+
+/** Tools monitored for same-page repetition loops. */
+export const PAGE_LOOP_MONITOR_TOOLS = new Set([
+	'click',
+	'getElements',
+	'inspectElement',
+	'paginateElements',
+	'pressKey',
+])
+
 /**
  * Resolve the interactive-element page size for agent observations.
  * @returns {number}

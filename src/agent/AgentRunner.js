@@ -12,6 +12,12 @@ import {
 } from './agentConfig.js'
 import { isAgentVisionAvailable } from './agentModels.js'
 import {
+	attributeProgressToRecentSteps,
+	buildObservationFingerprint,
+	buildRepeatedStalledActionFeedback,
+	observationFingerprintsEqual,
+} from './agentProgress.js'
+import {
 	clearPickedSelector,
 	mustPickBeforeAnswer,
 	PICK_ELEMENT_HINT,
@@ -143,6 +149,8 @@ export default class AgentRunner {
 		const cacheEnabled = isObservationCacheEnabled()
 		const knownSelectors = new Set()
 		let hasNavigated = false
+		let lastAttributedStepIndex = 0
+		let previousObservationFingerprint = null
 		/** @type {import('puppeteer').Browser | null} */
 		let agentBrowser = null
 
@@ -203,6 +211,27 @@ export default class AgentRunner {
 				}
 				registerObservationSelectors(knownSelectors, observation.elements)
 
+				const currentObservationFingerprint = buildObservationFingerprint(
+					/** @type {import('./observePage.js').PageObservation} */ (observation),
+				)
+
+				if (previousObservationFingerprint !== null) {
+					const madeProgress = !observationFingerprintsEqual(
+						previousObservationFingerprint,
+						currentObservationFingerprint,
+					)
+					attributeProgressToRecentSteps(steps, lastAttributedStepIndex, madeProgress)
+					lastAttributedStepIndex = steps.length
+
+					const stalledActionFeedback = buildRepeatedStalledActionFeedback(steps)
+
+					if (stalledActionFeedback) {
+						pendingFeedback.push(stalledActionFeedback)
+					}
+				}
+
+				previousObservationFingerprint = currentObservationFingerprint
+
 				const feedback = [...pendingFeedback]
 				pendingFeedback = []
 				const modelMessages = buildAgentModelMessages({
@@ -252,6 +281,7 @@ export default class AgentRunner {
 								currentUrl: page.url(),
 								knownSelectors,
 								elements: observation.elements,
+								elementsPage: observation.elementsPage,
 							})
 
 							if (dynamicRegistry.has(toolName)) {
@@ -312,6 +342,7 @@ export default class AgentRunner {
 							params,
 							result,
 							error: toolError,
+							pageUrl: page.url(),
 							timestamp: new Date().toISOString(),
 						})
 

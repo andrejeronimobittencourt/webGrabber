@@ -12,7 +12,7 @@ import { PICK_ELEMENT_HINT } from '../../src/agent/agentEnvironment.js'
 test('buildObservationMessage prefixes JSON observation payload', () => {
 	const message = buildObservationMessage({ url: 'https://example.com', elements: [] })
 
-	assert.match(message, /^Current page observation \(elements are the only selector source/)
+	assert.match(message, /^Current page observation:\n/)
 	assert.match(message, /"url":"https:\/\/example.com"/)
 })
 
@@ -33,12 +33,12 @@ test('buildAgentModelMessages sends structured context without chat history', ()
 	assert.strictEqual(messages[0].role, 'system')
 	assert.match(String(messages[0].content), /Today's date is 2026-06-21/)
 	assert.strictEqual(messages[1].content, 'Go to example.com')
-	assert.match(String(messages[2].content), /^Tools called this run \(results are not listed/)
+	assert.match(String(messages[2].content), /^Tools called this run:\n/)
 	assert.match(String(messages[2].content), /"tool": "navigate"/)
 	assert.match(String(messages[2].content), /"tool": "click"/)
 	assert.doesNotMatch(String(messages[2].content), /"result"/)
 	assert.match(String(messages[3].content), /^Feedback from last step:/)
-	assert.match(String(messages[4].content), /^Current page observation \(elements are the only selector source/)
+	assert.match(String(messages[4].content), /^Current page observation:\n/)
 	assert.strictEqual(messages.filter(isObservationMessage).length, 1)
 })
 
@@ -50,7 +50,7 @@ test('buildAgentModelMessages omits tool history and feedback when empty', () =>
 
 	assert.strictEqual(messages.length, 3)
 	assert.strictEqual(messages[1].content, 'Go to example.com')
-	assert.match(String(messages[2].content), /^Current page observation \(elements are the only selector source/)
+	assert.match(String(messages[2].content), /^Current page observation:\n/)
 })
 
 test('buildToolHistoryMessage includes tool names and params only', () => {

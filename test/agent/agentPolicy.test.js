@@ -130,6 +130,18 @@ test('AgentPolicy suggests elements when click omits selector but passes text', 
 	}
 })
 
+test('AgentPolicy rejects paginateElements when hasMore is false', () => {
+	const policy = new AgentPolicy()
+
+	assert.throws(
+		() =>
+			policy.validateAction('paginateElements', { offset: 25 }, {
+				elementsPage: { hasMore: false },
+			}),
+		/hasMore is false/,
+	)
+})
+
 test('AgentPolicy rejects selectors outside the observation', () => {
 	const policy = new AgentPolicy()
 	const knownSelectors = new Set(['textarea[name="q"]'])
