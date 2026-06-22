@@ -1,20 +1,26 @@
-import { CHEATSHEET_SELECTOR_REJECTION_HINT } from './agentCheatsheet.js'
-import { PICK_ELEMENT_HINT } from './agentPick.js'
+import { SELECTOR_NOT_IN_OBSERVATION } from './agentEnvironment.js'
 import { AgentValidationError } from './agentErrors.js'
+import { findElementsByText } from './agentObservationFormat.js'
 import { validateGrabParameters } from '../../packages/core/grabParameters.js'
-import { BUILTIN_AGENT_TOOL_NAMES } from '../../packages/core/utils/builtinAgentToolNames.js'
+import { BUILTIN_AGENT_TOOL_NAMES, EXPORT_AGENT_TOOL_NAMES } from '../../packages/core/utils/builtinAgentToolNames.js'
 
 /**
  * @typedef {import('./agentDynamicTools.js').DynamicToolRegistryEntry} DynamicToolRegistryEntry
  */
 
-const KNOWN_SELECTOR_ACTIONS = new Set([
+const SELECTOR_ACTIONS = new Set([
 	'click',
-	'type',
+	'getElements',
 	'inspectElement',
 	'pressKey',
+	'type',
+])
+
+const REQUIRED_SELECTOR_ACTIONS = new Set([
+	'click',
 	'getElements',
-	'pickElement',
+	'inspectElement',
+	'type',
 ])
 
 /**
@@ -24,9 +30,10 @@ export default class AgentPolicy {
 	#maxSteps
 	#allowedHosts
 	#dynamicRegistry
+	#exportMode
 
 	/**
-	 * @param {{ maxSteps?: number, allowedHosts?: string[], dynamicRegistry?: Map<string, DynamicToolRegistryEntry> }} [options]
+	 * @param {{ maxSteps?: number, allowedHosts?: string[], dynamicRegistry?: Map<string, DynamicToolRegistryEntry>, exportMode?: boolean }} [options]
 	 */
 	constructor(options = {}) {
 		this.#maxSteps =
@@ -38,6 +45,7 @@ export default class AgentPolicy {
 				.map((host) => host.trim())
 				.filter(Boolean)
 		this.#dynamicRegistry = options.dynamicRegistry ?? new Map()
+		this.#exportMode = options.exportMode ?? false
 	}
 
 	get maxSteps() {
@@ -49,17 +57,32 @@ export default class AgentPolicy {
 	}
 
 	/**
+	 * @returns {string[]}
+	 */
+	listAllowedToolNames() {
+		return [
+			...BUILTIN_AGENT_TOOL_NAMES,
+			...(this.#exportMode ? EXPORT_AGENT_TOOL_NAMES : []),
+			...this.#dynamicRegistry.keys(),
+		]
+	}
+
+	/**
 	 * @param {string} name
 	 * @returns {boolean}
 	 */
 	isAllowedAction(name) {
-		return BUILTIN_AGENT_TOOL_NAMES.includes(name) || this.#dynamicRegistry.has(name)
+		return (
+			BUILTIN_AGENT_TOOL_NAMES.includes(name) ||
+			(this.#exportMode && EXPORT_AGENT_TOOL_NAMES.includes(name)) ||
+			this.#dynamicRegistry.has(name)
+		)
 	}
 
 	/**
 	 * @param {string} name
 	 * @param {Record<string, unknown>} params
-	 * @param {{ currentUrl?: string, knownSelectors?: Set<string>, pickedSelector?: string | null }} [context]
+	 * @param {{ currentUrl?: string, knownSelectors?: Set<string>, elements?: import('./observePage.js').PageElement[] }} [context]
 	 */
 	validateAction(name, params, context = {}) {
 		const dynamicEntry = this.#dynamicRegistry.get(name)
@@ -70,7 +93,7 @@ export default class AgentPolicy {
 		}
 
 		if (!this.isAllowedAction(name)) {
-			throw new Error(`Action "${name}" is not allowed in agent mode`)
+			throw AgentValidationError.actionNotAllowed(name, this.listAllowedToolNames())
 		}
 
 		if (name === 'navigate' && typeof params.url === 'string') {
@@ -81,47 +104,53 @@ export default class AgentPolicy {
 			throw new Error('switchTab requires a tabKey string')
 		}
 
-		if (name === 'pickElement' && typeof params.selector === 'string') {
-			this.validateCheatsheetSelector(params.selector, context.knownSelectors)
-			return
+		if (REQUIRED_SELECTOR_ACTIONS.has(name)) {
+			this.validateRequiredSelector(name, params, context.elements ?? [])
 		}
 
-		if (KNOWN_SELECTOR_ACTIONS.has(name) && typeof params.selector === 'string') {
-			this.validateCheatsheetSelector(params.selector, context.knownSelectors)
-			this.validatePickedSelector(name, params.selector, context.pickedSelector)
+		if (
+			(name === 'pickElement' || SELECTOR_ACTIONS.has(name)) &&
+			typeof params.selector === 'string'
+		) {
+			this.validateObservationSelector(params.selector, context.knownSelectors, context.elements ?? [])
 		}
 	}
 
 	/**
-	 * @param {string} actionName
-	 * @param {string} selector
-	 * @param {string | null | undefined} pickedSelector
+	 * @param {string} toolName
+	 * @param {Record<string, unknown>} params
+	 * @param {import('./observePage.js').PageElement[]} elements
 	 */
-	validatePickedSelector(actionName, selector, pickedSelector) {
-		if (actionName === 'pickElement') {
+	validateRequiredSelector(toolName, params, elements) {
+		const selector = typeof params.selector === 'string' ? params.selector.trim() : ''
+
+		if (selector) {
 			return
 		}
 
-		if (!pickedSelector) {
-			throw AgentValidationError.pickRequired(PICK_ELEMENT_HINT)
-		}
+		const textHint = typeof params.text === 'string' ? params.text : ''
+		const suggestedElements = textHint ? findElementsByText(elements, textHint) : []
 
-		if (selector !== pickedSelector) {
-			throw AgentValidationError.pickMismatch(selector, pickedSelector, PICK_ELEMENT_HINT)
-		}
+		throw AgentValidationError.missingSelector(toolName, suggestedElements)
 	}
 
 	/**
 	 * @param {string} selector
 	 * @param {Set<string> | undefined} knownSelectors
+	 * @param {import('./observePage.js').PageElement[]} elements
 	 */
-	validateCheatsheetSelector(selector, knownSelectors) {
+	validateObservationSelector(selector, knownSelectors, elements = []) {
 		if (!knownSelectors || knownSelectors.size === 0) {
-			throw AgentValidationError.cheatsheetEmpty(selector, CHEATSHEET_SELECTOR_REJECTION_HINT)
+			throw AgentValidationError.observationSelectorsEmpty(selector, SELECTOR_NOT_IN_OBSERVATION)
 		}
 
 		if (!knownSelectors.has(selector)) {
-			throw AgentValidationError.cheatsheetUnknown(selector, CHEATSHEET_SELECTOR_REJECTION_HINT)
+			const suggestedElements = findElementsByText(elements, selector)
+			throw AgentValidationError.selectorNotInObservation(
+				selector,
+				SELECTOR_NOT_IN_OBSERVATION,
+				suggestedElements,
+			)
 		}
 	}
 

@@ -7,7 +7,6 @@
  */
 
 import { resolveReasonModel, resolveReasoningEffort, resolveVisionModel } from './agentModels.js'
-
 /**
  * @param {string} baseUrl
  * @param {unknown} error
@@ -106,8 +105,7 @@ export default class OllamaClient {
 			.filter(Boolean)
 			.join(' — ')
 		const prompt =
-			'Describe this web page screenshot for a browser automation agent. ' +
-			'Focus on visible content, layout, and interactive elements useful for navigation and extraction.' +
+			'Describe this screenshot. Report visible content and interactive elements.' +
 			(context.selector
 				? ' This is a focused crop of a single target element.'
 				: ' This shows only the current viewport, not the full page.') +

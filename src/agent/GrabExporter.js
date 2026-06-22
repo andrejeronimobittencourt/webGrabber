@@ -1,7 +1,7 @@
 import {
 	AGENT_ONLY_EXPORT_ACTIONS,
 	PICK_CONSUMING_ACTIONS,
-} from './agentToolCatalog.js'
+} from './agentConfig.js'
 import { mapAgentToolToEngineAction } from './AgentToolMapper.js'
 import { grabSchema, formatGrabValidationError } from '../../packages/core/schemas/grabSchema.js'
 import { FileSystem } from '../../packages/core/utils/FileSystem.js'

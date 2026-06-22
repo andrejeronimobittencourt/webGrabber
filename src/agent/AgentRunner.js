@@ -4,54 +4,60 @@ import { present } from '../../packages/core/infrastructure/presenter/present.js
 import AgentPolicy from './AgentPolicy.js'
 import AgentObservationCache, { isMutatingAgentTool } from './AgentObservationCache.js'
 import { mapAgentToolToEngineAction } from './AgentToolMapper.js'
-import { isObservationCacheEnabled, resolveElementPageSize } from './agentConfig.js'
 import {
-	AGENT_CHEATSHEET_SYSTEM_GUIDANCE,
-	AGENT_FINAL_ANSWER_GUIDANCE,
-	OBSERVATION_EXPLORATION_NOTE,
-	registerCheatsheetSelectors,
-} from './agentCheatsheet.js'
+	isObservationCacheEnabled,
+	resolveElementPageSize,
+	AGENT_QUIET_TOOLS,
+	shouldRefreshKnownSelectorsAfterTool,
+} from './agentConfig.js'
+import { isAgentVisionAvailable } from './agentModels.js'
+import {
+	clearPickedSelector,
+	mustPickBeforeAnswer,
+	PICK_ELEMENT_HINT,
+	registerObservationSelectors,
+	setPickedSelector,
+} from './agentEnvironment.js'
 import OllamaClient from './OllamaClient.js'
 import { buildAgentTools } from './ToolSchemaBuilder.js'
 import {
 	buildDynamicAgentTools,
 	buildDynamicToolRegistry,
+	runDynamicAgentTool,
 } from './agentDynamicTools.js'
-import { runDynamicAgentTool } from './runAgentDynamicTool.js'
 import { loadGrabCatalog } from '../utils/loadGrabs.js'
-import { createDefaultVisibleElementListState, resolveVisibleElementListState } from './visibleElementProbe.js'
+import { exportAgentRunGrab } from './GrabExporter.js'
+import {
+	createDefaultInteractiveElementListState,
+	resolveInteractiveElementListState,
+} from './interactiveElementList.js'
 import {
 	buildElementsPageMeta,
 	enrichObservationWithVision,
 	inspectElement,
 	isAgentPreNavigatePageUrl,
-	listElements,
+	paginateElements,
 	observePage,
-	paginateVisibleElements,
+	refreshKnownSelectorsFromPage,
 } from './observePage.js'
 import { safeAgentPageUrl, waitForAgentPageSettle } from './waitForAgentPageSettle.js'
 import {
 	bindAgentTabSync,
+	listAgentTabs,
 	syncAgentBrowserTabs,
+	switchAgentTab,
 	unbindAgentTabSync,
-} from './AgentTabSync.js'
-import { listAgentTabs, switchAgentTab } from './agentTabs.js'
-import { AGENT_QUIET_TOOLS } from './agentToolCatalog.js'
+} from './agentTabs.js'
 import {
-	clearPickedSelector,
-	mustPickBeforeAnswer,
-	PICK_ELEMENT_HINT,
-	setPickedSelector,
-} from './agentPick.js'
-import { formatAgentToolErrorForUser } from './formatAgentToolErrorForUser.js'
-import { exportAgentRunGrab } from './GrabExporter.js'
-
-const AGENT_SYSTEM_PROMPT =
-	'You are a browser automation agent for webGrabber. ' +
-	'Use the provided tools to complete the user task. ' +
-	AGENT_FINAL_ANSWER_GUIDANCE +
-	'When the task is complete, stop calling tools and reply with the answer only—no preamble, summary of steps, or formatting flourishes. ' +
-	AGENT_CHEATSHEET_SYSTEM_GUIDANCE
+	buildAgentModelMessages,
+	buildAgentToolResultForModel,
+	EMPTY_ASSISTANT_NUDGE,
+	formatAgentToolErrorForUser,
+	formatAgentToolFeedbackForModel,
+	hasAssistantToolCalls,
+	isEmptyAssistantTurn,
+	resolveAssistantAnswerText,
+} from './agentMessages.js'
 
 /**
  * @typedef {import('./AgentToolMapper.js').AgentStep} AgentStep
@@ -114,27 +120,23 @@ export default class AgentRunner {
 			customActions: importableCustomActions,
 		})
 		const dynamicToolNames = new Set(dynamicRegistry.keys())
+		const exportMode = Boolean(exportGrabName)
 		const policy =
 			this.#policyOptions.policy ??
-			new AgentPolicy({ ...this.#policyOptions, dynamicRegistry })
+			new AgentPolicy({ ...this.#policyOptions, dynamicRegistry, exportMode })
 
 		const brain = this.#engine.createBrain()
 		brain.run.agentMode = true
 		brain.run.grabCatalog = grabCatalog
 		brain.run.grabCallStack = []
-		brain.run.visibleElementList = createDefaultVisibleElementListState()
+		brain.run.elementList = createDefaultInteractiveElementListState()
 		brain.run.pickedSelector = null
 		/** @type {AgentRunResult['steps']} */
 		const steps = []
-		const tools = buildAgentTools({ dynamicTools })
-		/** @type {import('./OllamaClient.js').OllamaChatMessage[]} */
-		const messages = [
-			{
-				role: 'system',
-				content: AGENT_SYSTEM_PROMPT,
-			},
-			{ role: 'user', content: instruction },
-		]
+		const visionAvailable = isAgentVisionAvailable(this.#client)
+		const tools = buildAgentTools({ dynamicTools, visionAvailable, exportMode })
+		/** @type {string[]} */
+		let pendingFeedback = []
 
 		let answer = null
 		const observationCache = new AgentObservationCache()
@@ -164,7 +166,7 @@ export default class AgentRunner {
 					cacheEnabled,
 					brain,
 					hasNavigated,
-					visibleElementList: brain.run.visibleElementList,
+					elementList: brain.run.elementList,
 				}
 
 				let observation
@@ -182,8 +184,6 @@ export default class AgentRunner {
 						title: '',
 						elements: [],
 						elementsPage: buildElementsPageMeta(0, 0, resolveElementPageSize()),
-						visibleElements: [],
-						visibleElementsPage: buildElementsPageMeta(0, 0, resolveElementPageSize()),
 						pickedSelector: brain.run.pickedSelector,
 						lastResult: brain.recall(constants.inputKey),
 						tabs: { activeTabKey: null, tabs: [] },
@@ -201,16 +201,20 @@ export default class AgentRunner {
 						{ force: true },
 					)
 				}
-				registerCheatsheetSelectors(knownSelectors, observation.elements)
-				registerCheatsheetSelectors(knownSelectors, observation.visibleElements)
-				messages.push({
-					role: 'user',
-					content:
-						`Current page observation:\n${JSON.stringify(observation, null, 2)}\n\n` +
-						OBSERVATION_EXPLORATION_NOTE,
+				registerObservationSelectors(knownSelectors, observation.elements)
+
+				const feedback = [...pendingFeedback]
+				pendingFeedback = []
+				const modelMessages = buildAgentModelMessages({
+					instruction,
+					observation,
+					steps,
+					feedback,
+					visionAvailable,
+					exportMode,
 				})
 
-				const completion = await this.#client.chat(messages, tools)
+				const completion = await this.#client.chat(modelMessages, tools)
 				const choice = completion.choices?.[0]
 
 				if (!choice?.message) {
@@ -218,9 +222,8 @@ export default class AgentRunner {
 				}
 
 				const assistantMessage = choice.message
-				messages.push(assistantMessage)
 
-				if (assistantMessage.tool_calls?.length) {
+				if (hasAssistantToolCalls(assistantMessage)) {
 					const usedMutatingTool = assistantMessage.tool_calls.some((toolCall) =>
 						isMutatingAgentTool(toolCall.function.name) ||
 						dynamicToolNames.has(toolCall.function.name),
@@ -248,7 +251,7 @@ export default class AgentRunner {
 							policy.validateAction(toolName, params, {
 								currentUrl: page.url(),
 								knownSelectors,
-								pickedSelector: brain.run.pickedSelector,
+								elements: observation.elements,
 							})
 
 							if (dynamicRegistry.has(toolName)) {
@@ -261,22 +264,18 @@ export default class AgentRunner {
 							} else if (toolName === 'pickElement') {
 								setPickedSelector(brain, params.selector)
 								result = { selector: params.selector, picked: true }
-							} else if (toolName === 'paginateVisibleElements') {
-								const nextState = resolveVisibleElementListState(
-									brain.run.visibleElementList,
+							} else if (toolName === 'paginateElements') {
+								const nextState = resolveInteractiveElementListState(
+									brain.run.elementList,
 									params,
 								)
-								brain.run.visibleElementList = nextState
+								brain.run.elementList = nextState
 								clearPickedSelector(brain)
-								result = await paginateVisibleElements(page, {
-									tags: nextState.tags,
+								result = await paginateElements(page, {
 									offset: nextState.offset,
 									limit: params.limit,
 								})
-								registerCheatsheetSelectors(knownSelectors, result.elements)
-							} else if (toolName === 'listElements') {
-								result = await listElements(page, params)
-								registerCheatsheetSelectors(knownSelectors, result.elements)
+								registerObservationSelectors(knownSelectors, result.elements)
 							} else if (toolName === 'listTabs') {
 								result = await listAgentTabs(brain)
 							} else if (toolName === 'switchTab') {
@@ -291,7 +290,10 @@ export default class AgentRunner {
 							}
 						} catch (error) {
 							toolError = error instanceof Error ? error.message : String(error)
-							result = { error: toolError }
+							pendingFeedback.push(
+								formatAgentToolFeedbackForModel(toolName, error, knownSelectors),
+							)
+							result = buildAgentToolResultForModel(error, knownSelectors)
 							present(
 								[
 									{ text: 'Agent tool failed: ', color: 'red', style: 'bold' },
@@ -318,7 +320,8 @@ export default class AgentRunner {
 						}
 
 						if (
-							(isMutatingAgentTool(toolName) || dynamicToolNames.has(toolName)) &&
+							(shouldRefreshKnownSelectorsAfterTool(toolName) ||
+								dynamicToolNames.has(toolName)) &&
 							!toolError
 						) {
 							clearPickedSelector(brain)
@@ -331,37 +334,45 @@ export default class AgentRunner {
 							}
 
 							await waitForAgentPageSettle(brain.browser.activePage)
+							await refreshKnownSelectorsFromPage(
+								brain.browser.activePage,
+								brain,
+								knownSelectors,
+							)
+						} else if (toolName === 'type' && !toolError && typeof params.selector === 'string') {
+							knownSelectors.add(params.selector)
 						}
-
-						messages.push({
-							role: 'tool',
-							tool_call_id: toolCall.id,
-							content: JSON.stringify(result ?? null),
-						})
 					}
 
 					if (usedMutatingTool) {
 						observationCache.invalidate()
-						knownSelectors.clear()
+						brain.run.elementList = createDefaultInteractiveElementListState()
 					}
 
 					continue
 				}
 
-				if (assistantMessage.content?.trim()) {
-					if (mustPickBeforeAnswer(steps, brain.run.pickedSelector, { hasNavigated })) {
-						messages.push({
-							role: 'user',
-							content: PICK_ELEMENT_HINT,
-						})
-						continue
-					}
-
-					answer = assistantMessage.content.trim()
-					break
+				if (isEmptyAssistantTurn(assistantMessage)) {
+					present(
+						[
+							{ text: 'Agent: empty model response, retrying', color: 'yellow', style: 'bold' },
+						],
+						brain,
+						{ force: true },
+					)
+					pendingFeedback.push(EMPTY_ASSISTANT_NUDGE)
+					continue
 				}
 
-				throw new Error('Ollama returned neither tool calls nor a final answer')
+				const answerText = resolveAssistantAnswerText(assistantMessage)
+
+				if (mustPickBeforeAnswer(steps, brain.run.pickedSelector, exportMode)) {
+					pendingFeedback.push(PICK_ELEMENT_HINT)
+					continue
+				}
+
+				answer = answerText
+				break
 			}
 
 			if (!answer) {

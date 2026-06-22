@@ -6,9 +6,8 @@ import {
 	observePage,
 } from '../../src/agent/observePage.js'
 
-test('observePage reuses cached DOM cheatsheet for unchanged fingerprint', async () => {
-	let interactiveCollectCalls = 0
-	let visibleCollectCalls = 0
+test('observePage reuses cached DOM observation for unchanged fingerprint', async () => {
+	let collectCalls = 0
 	let fingerprintStep = 0
 	const page = {
 		url: () => 'https://example.com',
@@ -16,28 +15,12 @@ test('observePage reuses cached DOM cheatsheet for unchanged fingerprint', async
 			return 'Example'
 		},
 		async evaluate(_fn, args) {
-			if (args?.collectionMode === 'interactive') {
-				interactiveCollectCalls += 1
+			if (typeof args?.elementOffset === 'number') {
+				collectCalls += 1
 				return {
-					elements: [
-						{
-							index: 0,
-							selector: 'input[name="q"]',
-							tag: 'input',
-							text: 'Search',
-							href: null,
-							type: 'search',
-							name: 'q',
-							id: null,
-						},
-					],
+					elements: [{ selector: 'input[name="q"]', text: 'Search' }],
 					total: 1,
 				}
-			}
-
-			if (args?.collectionMode === 'tags') {
-				visibleCollectCalls += 1
-				return { elements: [], total: 0 }
 			}
 
 			fingerprintStep += 1
@@ -58,8 +41,7 @@ test('observePage reuses cached DOM cheatsheet for unchanged fingerprint', async
 	await observePage(page, brain, { cache, cacheEnabled: true, includeScreenshot: false })
 	await observePage(page, brain, { cache, cacheEnabled: true, includeScreenshot: false })
 
-	assert.strictEqual(interactiveCollectCalls, 1)
-	assert.strictEqual(visibleCollectCalls, 2)
+	assert.strictEqual(collectCalls, 1)
 })
 
 test('enrichObservationWithVision reuses cached visual summary', async () => {

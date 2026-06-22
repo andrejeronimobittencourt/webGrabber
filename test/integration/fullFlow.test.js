@@ -6,12 +6,10 @@ import { setPresenter } from '../../src/infrastructure/presenter/present.js'
 import Grabber from '../../src/core/grabber/Grabber.js'
 import PuppeteerPageFactory from '../../packages/core/infrastructure/PuppeteerPageFactory.js'
 import { FileSystem } from '../../src/utils/FileSystem.js'
-import { removeOutputDirs } from '../helpers/cleanupOutput.js'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
-const outputDirs = ['integration-test', 'integration_test']
 
 test('Full Integration Flow', async (_t) => {
 	const server = await startServer()
@@ -29,7 +27,6 @@ test('Full Integration Flow', async (_t) => {
 
 		assert.strictEqual(response.result, 'success')
 	} finally {
-		await removeOutputDirs(outputDirs)
 		try {
 			await PuppeteerPageFactory.close()
 		} catch {

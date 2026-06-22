@@ -1,6 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert'
 import {
+	isAgentVisionAvailable,
 	isReasonThinkingEnabled,
 	isVisionEnabled,
 	resolveReasonModel,
@@ -85,6 +86,21 @@ test('isVisionEnabled reads AGENT_VISION', () => {
 
 		process.env.AGENT_VISION = 'false'
 		assert.strictEqual(isVisionEnabled(), false)
+	} finally {
+		restoreEnv(snapshot)
+	}
+})
+
+test('isAgentVisionAvailable requires vision enabled and a vision model', () => {
+	const snapshot = { ...process.env }
+
+	try {
+		delete process.env.AGENT_VISION
+		assert.strictEqual(isAgentVisionAvailable({ visionModel: 'vision-model' }), false)
+
+		process.env.AGENT_VISION = 'true'
+		assert.strictEqual(isAgentVisionAvailable({ visionModel: null }), false)
+		assert.strictEqual(isAgentVisionAvailable({ visionModel: 'vision-model' }), true)
 	} finally {
 		restoreEnv(snapshot)
 	}

@@ -10,7 +10,7 @@ import { buildElementsPageMeta } from '../../src/agent/observePage.js'
 
 test('isMutatingAgentTool identifies page-changing tools', () => {
 	assert.strictEqual(isMutatingAgentTool('click'), true)
-	assert.strictEqual(isMutatingAgentTool('listElements'), false)
+	assert.strictEqual(isMutatingAgentTool('paginateElements'), false)
 	assert.strictEqual(isMutatingAgentTool('getElements'), false)
 })
 
@@ -46,7 +46,7 @@ test('AgentObservationCache stores and clears DOM and vision entries', () => {
 	const elementsPage = buildElementsPageMeta(1, 0, 100)
 
 	cache.setDom(domKey, {
-		elements: [{ index: 0, selector: '#go', tag: 'button', text: 'Go', href: null, type: null, name: null, id: 'go' }],
+		elements: [{ selector: '#go', text: 'Go' }],
 		elementsPage,
 	})
 	cache.setVision(visionKey, 'A search page.')

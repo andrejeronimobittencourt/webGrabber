@@ -69,6 +69,18 @@ export async function computePageFingerprint(page) {
 	}))
 
 	const domSignature = await page.evaluate(() => {
+		const nonRenderedAncestorSelector = 'script, style, noscript, template, head'
+
+		const isCollectableBodyElement = (element) => {
+			const body = document.body
+
+			if (!body || !body.contains(element)) {
+				return false
+			}
+
+			return !element.closest(nonRenderedAncestorSelector)
+		}
+
 		const isInteractiveVisible = (element) => {
 			if (element instanceof HTMLInputElement && element.type === 'hidden') {
 				return false
@@ -89,10 +101,18 @@ export async function computePageFingerprint(page) {
 			return rect.width > 0 && rect.height > 0
 		}
 
-		const nodes = document.querySelectorAll(
+		const body = document.body
+
+		if (!body) {
+			return '0'
+		}
+
+		const nodes = body.querySelectorAll(
 			'a, button, input, textarea, select, [role="button"]',
 		)
-		const visibleNodes = Array.from(nodes).filter(isInteractiveVisible)
+		const visibleNodes = Array.from(nodes)
+			.filter(isCollectableBodyElement)
+			.filter(isInteractiveVisible)
 		let signature = String(visibleNodes.length)
 
 		for (const element of visibleNodes) {
@@ -114,7 +134,7 @@ export async function computePageFingerprint(page) {
 }
 
 /**
- * Per-run cache for agent DOM cheatsheet pages and viewport vision summaries.
+ * Per-run cache for agent DOM observation pages and viewport vision summaries.
  */
 export default class AgentObservationCache {
 	#dom = new Map()
@@ -130,7 +150,7 @@ export default class AgentObservationCache {
 
 	/**
 	 * @param {string} domCacheKey
-	 * @returns {{ elements: import('./observePage.js').PageElementSnapshot[], elementsPage: import('./observePage.js').ElementsPageMeta }}
+	 * @returns {{ elements: import('./observePage.js').PageElement[], elementsPage: import('./observePage.js').ElementsPageMeta }}
 	 */
 	getDom(domCacheKey) {
 		const entry = this.#dom.get(domCacheKey)
@@ -147,7 +167,7 @@ export default class AgentObservationCache {
 
 	/**
 	 * @param {string} domCacheKey
-	 * @param {{ elements: import('./observePage.js').PageElementSnapshot[], elementsPage: import('./observePage.js').ElementsPageMeta }} value
+	 * @param {{ elements: import('./observePage.js').PageElement[], elementsPage: import('./observePage.js').ElementsPageMeta }} value
 	 */
 	setDom(domCacheKey, value) {
 		this.#dom.set(domCacheKey, {

@@ -61,3 +61,12 @@ export function resolveVisionModel(options = {}) {
 export function isVisionEnabled() {
 	return process.env.AGENT_VISION === 'true'
 }
+
+/**
+ * Whether the agent can receive vision summaries from observations or inspectElement.
+ * @param {{ visionModel?: string | null }} [client]
+ * @returns {boolean}
+ */
+export function isAgentVisionAvailable(client = {}) {
+	return isVisionEnabled() && Boolean(client.visionModel)
+}

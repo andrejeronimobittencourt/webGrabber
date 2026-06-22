@@ -1,6 +1,9 @@
 import { DEFAULT_AGENT_NAVIGATE_WAIT_UNTIL } from './AgentToolMapper.js'
 import { DEFAULT_AGENT_ELEMENT_PAGE_SIZE } from './agentConfig.js'
-import { BUILTIN_AGENT_TOOL_NAMES } from '../../packages/core/utils/builtinAgentToolNames.js'
+import {
+	BUILTIN_AGENT_TOOL_NAMES,
+	EXPORT_AGENT_TOOL_NAMES,
+} from '../../packages/core/utils/builtinAgentToolNames.js'
 
 /**
  * @typedef {Object} AgentToolDefinition
@@ -8,13 +11,18 @@ import { BUILTIN_AGENT_TOOL_NAMES } from '../../packages/core/utils/builtinAgent
  * @property {{ name: string, description: string, parameters: object }} function
  */
 
+const SELECTOR_PARAM = {
+	type: 'string',
+	description: 'Exact selector string copied from elements[].selector in the current observation.',
+}
+
 /** @type {AgentToolDefinition[]} */
 const AGENT_TOOL_DEFINITIONS = [
 	{
 		type: 'function',
 		function: {
 			name: 'navigate',
-			description: 'Navigate the browser to a URL.',
+			description: 'Open a URL in the browser. Updates the observation on the next turn.',
 			parameters: {
 				type: 'object',
 				properties: {
@@ -36,16 +44,11 @@ const AGENT_TOOL_DEFINITIONS = [
 		function: {
 			name: 'click',
 			description:
-				'Click an element matched by selector. Use a selector exactly as listed in elements.',
+				'Click an element. Requires selector from elements; element text is not a valid click target.',
 			parameters: {
 				type: 'object',
 				properties: {
-					selector: {
-						type: 'string',
-						description: 'CSS selector copied from the elements cheatsheet.',
-					},
-					text: { type: 'string', description: 'Optional fuzzy text match.' },
-					attribute: { type: 'string', description: 'Optional attribute name for matching.' },
+					selector: SELECTOR_PARAM,
 				},
 				required: ['selector'],
 				additionalProperties: false,
@@ -56,16 +59,12 @@ const AGENT_TOOL_DEFINITIONS = [
 		type: 'function',
 		function: {
 			name: 'type',
-			description:
-				'Type text into an input element. Use a selector exactly as listed in elements.',
+			description: 'Type text into an input or textarea identified by selector from elements.',
 			parameters: {
 				type: 'object',
 				properties: {
-					selector: {
-						type: 'string',
-						description: 'CSS selector copied from the elements cheatsheet.',
-					},
-					text: { type: 'string' },
+					selector: SELECTOR_PARAM,
+					text: { type: 'string', description: 'Text to type into the element.' },
 					secret: { type: 'boolean', description: 'Mask value in logs.' },
 				},
 				required: ['selector', 'text'],
@@ -76,48 +75,16 @@ const AGENT_TOOL_DEFINITIONS = [
 	{
 		type: 'function',
 		function: {
-			name: 'listElements',
+			name: 'paginateElements',
 			description:
-				'Fetch another page of the interactive-element cheatsheet from the current observation. ' +
-				'Use elementsPage.totalPages and pageIndex from observations; offset = pageIndex * limit. ' +
-				'If the target is missing after all pages, reveal hidden UI with visible controls first—it will appear in a later observation.',
+				'Change which elements slice appears in the next observation. Use elementsPage.nextOffset when hasMore is true.',
 			parameters: {
 				type: 'object',
 				properties: {
 					offset: {
 						type: 'number',
-						description: 'Optional zero-based element offset. Defaults to 0.',
-					},
-					limit: {
-						type: 'number',
-						description: `Optional page size. Defaults to ${DEFAULT_AGENT_ELEMENT_PAGE_SIZE}.`,
-					},
-				},
-				required: [],
-				additionalProperties: false,
-			},
-		},
-	},
-	{
-		type: 'function',
-		function: {
-			name: 'paginateVisibleElements',
-			description:
-				'Change the visibleElements page shown in the next observation. ' +
-				'Use visibleElementsPage.totalPages and pageIndex; offset = pageIndex * limit. ' +
-				'Call pickElement with one returned selector before acting on it or answering from it.',
-			parameters: {
-				type: 'object',
-				properties: {
-					tags: {
-						type: 'array',
-						items: { type: 'string' },
 						description:
-							'Optional primitive tags to scan, such as p, h1, span, div, li, time, or a.',
-					},
-					offset: {
-						type: 'number',
-						description: 'Optional zero-based visible element offset. Defaults to the current page.',
+							'Zero-based element offset for the next observation. Use elementsPage.nextOffset to advance.',
 					},
 					limit: {
 						type: 'number',
@@ -125,26 +92,6 @@ const AGENT_TOOL_DEFINITIONS = [
 					},
 				},
 				required: [],
-				additionalProperties: false,
-			},
-		},
-	},
-	{
-		type: 'function',
-		function: {
-			name: 'pickElement',
-			description:
-				'Signal which element from the observation you are acting on or answering from. ' +
-				'Required before click, type, inspectElement, pressKey, getElements, or your final answer.',
-			parameters: {
-				type: 'object',
-				properties: {
-					selector: {
-						type: 'string',
-						description: 'Selector copied exactly from the observation.',
-					},
-				},
-				required: ['selector'],
 				additionalProperties: false,
 			},
 		},
@@ -154,12 +101,11 @@ const AGENT_TOOL_DEFINITIONS = [
 		function: {
 			name: 'inspectElement',
 			description:
-				'Scroll a target into view, capture a focused screenshot, and return a vision summary. ' +
-				'Use to confirm a target or reveal off-screen content before click or type.',
+				'Scroll an element into view and return its text. Vision is not enabled—no image summary.',
 			parameters: {
 				type: 'object',
 				properties: {
-					selector: { type: 'string', description: 'CSS selector from the cheatsheet.' },
+					selector: SELECTOR_PARAM,
 				},
 				required: ['selector'],
 				additionalProperties: false,
@@ -171,7 +117,7 @@ const AGENT_TOOL_DEFINITIONS = [
 		function: {
 			name: 'pressKey',
 			description:
-				'Press a keyboard key. Prefer Enter after typing a search query instead of clicking submit buttons or guessed result links.',
+				'Press a keyboard key. Optionally focus an element first using selector from elements.',
 			parameters: {
 				type: 'object',
 				properties: {
@@ -193,8 +139,9 @@ const AGENT_TOOL_DEFINITIONS = [
 						],
 					},
 					selector: {
-						type: 'string',
-						description: 'Optional selector to focus before pressing the key.',
+						...SELECTOR_PARAM,
+						description:
+							'Optional. Exact selector from elements to focus before pressing the key.',
 					},
 				},
 				required: ['key'],
@@ -206,9 +153,7 @@ const AGENT_TOOL_DEFINITIONS = [
 		type: 'function',
 		function: {
 			name: 'listTabs',
-			description:
-				'List open browser tabs with tabKey, url, title, and which tab is active. ' +
-				'Use when a click opened the wrong page, an ad, or a popup and you need to inspect another tab.',
+			description: 'List open browser tabs and their tabKey values.',
 			parameters: {
 				type: 'object',
 				properties: {},
@@ -220,15 +165,13 @@ const AGENT_TOOL_DEFINITIONS = [
 		type: 'function',
 		function: {
 			name: 'switchTab',
-			description:
-				'Switch the active browser tab by tabKey from tabs in the observation or listTabs. ' +
-				'Use to return to the search page or leave an ad/popup tab before continuing.',
+			description: 'Switch the active browser tab using tabKey from tabs in the observation.',
 			parameters: {
 				type: 'object',
 				properties: {
 					tabKey: {
 						type: 'string',
-						description: 'Tab key from observation.tabs or listTabs.',
+						description: 'tabKey from observation.tabs or listTabs.',
 					},
 				},
 				required: ['tabKey'],
@@ -241,31 +184,15 @@ const AGENT_TOOL_DEFINITIONS = [
 		function: {
 			name: 'getElements',
 			description:
-				'Read text or an attribute from the DOM when visibleElements is not enough. ' +
-				'Call pickElement with the same selector first.',
+				'Read text or a DOM attribute not already available in elements[].text. Result appears in lastResult next turn.',
 			parameters: {
 				type: 'object',
 				properties: {
-					selector: {
+					selector: SELECTOR_PARAM,
+					attribute: {
 						type: 'string',
-						description: 'Selector copied from the observation and already picked with pickElement.',
+						description: 'Optional attribute name (for example href). Omit to read text content.',
 					},
-					attribute: { type: 'string', description: 'Optional attribute to read.' },
-				},
-				required: ['selector'],
-				additionalProperties: false,
-			},
-		},
-	},
-	{
-		type: 'function',
-		function: {
-			name: 'elementExists',
-			description: 'Check whether an element exists on the page.',
-			parameters: {
-				type: 'object',
-				properties: {
-					selector: { type: 'string' },
 				},
 				required: ['selector'],
 				additionalProperties: false,
@@ -276,7 +203,8 @@ const AGENT_TOOL_DEFINITIONS = [
 		type: 'function',
 		function: {
 			name: 'screenshot',
-			description: 'Capture a screenshot of the current page.',
+			description:
+				'Save a screenshot file for the user only. Does not change your observation and you cannot see the image.',
 			parameters: {
 				type: 'object',
 				properties: {
@@ -289,80 +217,68 @@ const AGENT_TOOL_DEFINITIONS = [
 			},
 		},
 	},
-	{
-		type: 'function',
-		function: {
-			name: 'setVariable',
-			description: 'Store a value in agent memory.',
-			parameters: {
-				type: 'object',
-				properties: {
-					key: { type: 'string' },
-					value: {},
-				},
-				required: ['key', 'value'],
-				additionalProperties: false,
-			},
-		},
-	},
-	{
-		type: 'function',
-		function: {
-			name: 'getVariable',
-			description: 'Load a stored variable into the INPUT pipe.',
-			parameters: {
-				type: 'object',
-				properties: {
-					key: { type: 'string' },
-					index: { type: 'number' },
-				},
-				required: ['key'],
-				additionalProperties: false,
-			},
-		},
-	},
-	{
-		type: 'function',
-		function: {
-			name: 'log',
-			description: 'Write a runtime log message.',
-			parameters: {
-				type: 'object',
-				properties: {
-					message: { type: 'string' },
-					color: { type: 'string' },
-					background: { type: 'string' },
-				},
-				required: ['message'],
-				additionalProperties: false,
-			},
-		},
-	},
 ]
 
-/**
- * Build OpenAI-compatible tool definitions for Ollama agent mode.
- * @param {{ dynamicTools?: AgentToolDefinition[] }} [options]
- * @returns {AgentToolDefinition[]}
- */
-export function buildAgentTools({ dynamicTools = [] } = {}) {
-	return [...AGENT_TOOL_DEFINITIONS, ...dynamicTools].map((tool) => ({
-		type: tool.type,
-		function: {
-			name: tool.function.name,
-			description: tool.function.description,
-			parameters: structuredClone(tool.function.parameters),
+/** @type {AgentToolDefinition} */
+const PICK_ELEMENT_TOOL_DEFINITION = {
+	type: 'function',
+	function: {
+		name: 'pickElement',
+		description:
+			'Export only: record which elements selector your final answer came from when getElements was not used.',
+		parameters: {
+			type: 'object',
+			properties: {
+				selector: SELECTOR_PARAM,
+			},
+			required: ['selector'],
+			additionalProperties: false,
 		},
-	}))
+	},
+}
+
+const VISION_TOOL_DESCRIPTIONS = {
+	inspectElement:
+		'Scroll an element into view and return its text plus a vision summary of the element.',
+	screenshot:
+		'Save a screenshot file for the user. Does not update your observation—read elements instead.',
 }
 
 /**
- * @param {{ dynamicTools?: AgentToolDefinition[] }} [options]
+ * Build OpenAI-compatible tool definitions for Ollama agent mode.
+ * @param {{ dynamicTools?: AgentToolDefinition[], visionAvailable?: boolean, exportMode?: boolean }} [options]
+ * @returns {AgentToolDefinition[]}
+ */
+export function buildAgentTools({ dynamicTools = [], visionAvailable = false, exportMode = false } = {}) {
+	const baseTools = exportMode
+		? [...AGENT_TOOL_DEFINITIONS, PICK_ELEMENT_TOOL_DEFINITION]
+		: AGENT_TOOL_DEFINITIONS
+
+	return [...baseTools, ...dynamicTools].map((tool) => {
+		const description =
+			visionAvailable && tool.function.name in VISION_TOOL_DESCRIPTIONS
+				? VISION_TOOL_DESCRIPTIONS[tool.function.name]
+				: tool.function.description
+
+		return {
+			type: tool.type,
+			function: {
+				name: tool.function.name,
+				description,
+				parameters: structuredClone(tool.function.parameters),
+			},
+		}
+	})
+}
+
+/**
+ * @param {{ dynamicTools?: AgentToolDefinition[], exportMode?: boolean }} [options]
  * @returns {string[]}
  */
-export function listAgentToolNames({ dynamicTools = [] } = {}) {
+export function listAgentToolNames({ dynamicTools = [], exportMode = false } = {}) {
 	return [
 		...BUILTIN_AGENT_TOOL_NAMES,
+		...(exportMode ? EXPORT_AGENT_TOOL_NAMES : []),
 		...dynamicTools.map((tool) => tool.function.name),
 	]
 }

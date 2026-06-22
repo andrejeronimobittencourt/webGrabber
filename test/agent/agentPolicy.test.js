@@ -1,14 +1,15 @@
 import test from 'node:test'
 import assert from 'node:assert'
 import AgentPolicy from '../../src/agent/AgentPolicy.js'
+import { AgentValidationError } from '../../src/agent/agentErrors.js'
 
 test('AgentPolicy allows curated actions', () => {
 	const policy = new AgentPolicy()
 	assert.strictEqual(policy.isAllowedAction('navigate'), true)
 	assert.strictEqual(policy.isAllowedAction('click'), true)
-	assert.strictEqual(policy.isAllowedAction('listElements'), true)
-	assert.strictEqual(policy.isAllowedAction('paginateVisibleElements'), true)
-	assert.strictEqual(policy.isAllowedAction('pickElement'), true)
+	assert.strictEqual(policy.isAllowedAction('paginateElements'), true)
+	assert.strictEqual(policy.isAllowedAction('pickElement'), false)
+	assert.strictEqual(new AgentPolicy({ exportMode: true }).isAllowedAction('pickElement'), true)
 	assert.strictEqual(policy.isAllowedAction('inspectElement'), true)
 	assert.strictEqual(policy.isAllowedAction('listTabs'), true)
 	assert.strictEqual(policy.isAllowedAction('switchTab'), true)
@@ -19,10 +20,28 @@ test('AgentPolicy allows curated actions', () => {
 
 test('AgentPolicy rejects blocked actions', () => {
 	const policy = new AgentPolicy()
-	assert.throws(
-		() => policy.validateAction('puppeteer', { func: 'goto', url: 'https://example.com' }),
-		/not allowed in agent mode/,
-	)
+
+	try {
+		policy.validateAction('puppeteer', { func: 'goto', url: 'https://example.com' })
+		assert.fail('Expected puppeteer to be rejected')
+	} catch (error) {
+		assert.match(error instanceof Error ? error.message : '', /not allowed/)
+		assert.match(error instanceof Error ? error.message : '', /Use only the provided tools:/)
+	}
+})
+
+test('AgentPolicy blocked action error lists provided tools for the model', () => {
+	const policy = new AgentPolicy()
+
+	try {
+		policy.validateAction('scroll', {})
+		assert.fail('Expected scroll to be rejected')
+	} catch (error) {
+		assert.match(error instanceof Error ? error.message : '', /Action "scroll" is not allowed/)
+		assert.match(error instanceof Error ? error.message : '', /Use only the provided tools:/)
+		assert.match(error instanceof Error ? error.message : '', /navigate/)
+		assert.match(error instanceof Error ? error.message : '', /pressKey/)
+	}
 })
 
 test('AgentPolicy validates dynamic importable grab tools', () => {
@@ -80,7 +99,38 @@ test('AgentPolicy reads max steps default', () => {
 	assert.strictEqual(policy.maxSteps, 30)
 })
 
-test('AgentPolicy rejects selectors outside the cheatsheet', () => {
+test('AgentPolicy rejects click without selector', () => {
+	const policy = new AgentPolicy()
+	const elements = [{ selector: 'a.link', text: 'Portugal' }]
+
+	assert.throws(
+		() =>
+			policy.validateAction('click', { text: 'Portugal' }, {
+				knownSelectors: new Set(['a.link']),
+				elements,
+			}),
+		/requires selector/,
+	)
+})
+
+test('AgentPolicy suggests elements when click omits selector but passes text', () => {
+	const policy = new AgentPolicy()
+	const elements = [{ selector: 'a.link', text: 'Portugal' }]
+
+	try {
+		policy.validateAction('click', { text: 'Portugal' }, {
+			knownSelectors: new Set(['a.link']),
+			elements,
+		})
+		assert.fail('Expected missing selector error')
+	} catch (error) {
+		assert.ok(error instanceof AgentValidationError)
+		assert.match(error.message, /suggestedElements/)
+		assert.strictEqual(error.suggestedElements?.length, 1)
+	}
+})
+
+test('AgentPolicy rejects selectors outside the observation', () => {
 	const policy = new AgentPolicy()
 	const knownSelectors = new Set(['textarea[name="q"]'])
 
@@ -89,23 +139,22 @@ test('AgentPolicy rejects selectors outside the cheatsheet', () => {
 			policy.validateAction('type', { selector: 'textarea[name="csi"]', text: 'test' }, {
 				knownSelectors,
 			}),
-		/not in the current element list/,
+		/not in the current observation/,
 	)
 })
 
-test('AgentPolicy allows selectors from the cheatsheet', () => {
+test('AgentPolicy allows selectors from the observation without pickElement', () => {
 	const policy = new AgentPolicy()
 	const knownSelectors = new Set(['textarea[name="q"]'])
 
 	assert.doesNotThrow(() =>
 		policy.validateAction('type', { selector: 'textarea[name="q"]', text: 'test' }, {
 			knownSelectors,
-			pickedSelector: 'textarea[name="q"]',
 		}),
 	)
 })
 
-test('AgentPolicy rejects getElements selectors outside known element lists', () => {
+test('AgentPolicy rejects getElements selectors outside the observation', () => {
 	const policy = new AgentPolicy()
 	const knownSelectors = new Set(['p.result'])
 
@@ -114,32 +163,12 @@ test('AgentPolicy rejects getElements selectors outside known element lists', ()
 			policy.validateAction('getElements', { selector: 'div.guessed' }, {
 				knownSelectors,
 			}),
-		/not in the current element list/,
+		/not in the current observation/,
 	)
 })
 
-test('AgentPolicy requires pickElement before selector actions', () => {
-	const policy = new AgentPolicy()
-	const knownSelectors = new Set(['p.result'])
-
-	assert.throws(
-		() =>
-			policy.validateAction('getElements', { selector: 'p.result' }, {
-				knownSelectors,
-			}),
-		/pickElement/,
-	)
-
-	assert.doesNotThrow(() =>
-		policy.validateAction('getElements', { selector: 'p.result' }, {
-			knownSelectors,
-			pickedSelector: 'p.result',
-		}),
-	)
-})
-
-test('AgentPolicy allows pickElement selectors from the observation', () => {
-	const policy = new AgentPolicy()
+test('AgentPolicy allows pickElement selectors from the observation during export', () => {
+	const policy = new AgentPolicy({ exportMode: true })
 	const knownSelectors = new Set(['p.result'])
 
 	assert.doesNotThrow(() =>

@@ -8,10 +8,11 @@ import {
 	computePageFingerprint,
 } from './AgentObservationCache.js'
 import { listAgentTabs } from './agentTabs.js'
+import { registerObservationSelectors } from './agentEnvironment.js'
 import {
-	createDefaultVisibleElementListState,
-	resolveVisibleElementListState,
-} from './visibleElementProbe.js'
+	createDefaultInteractiveElementListState,
+	resolveInteractiveElementListState,
+} from './interactiveElementList.js'
 
 /** URLs where viewport vision is skipped until the agent navigates. */
 const PRE_NAVIGATE_PAGE_URLS = new Set(['about:blank', 'chrome://newtab/'])
@@ -47,15 +48,9 @@ export function shouldIncludePageScreenshot(page, hasNavigated = false) {
  */
 
 /**
- * @typedef {Object} PageElementSnapshot
- * @property {number} index
+ * @typedef {Object} PageElement
  * @property {string} selector
- * @property {string} tag
  * @property {string} text
- * @property {string | null} href
- * @property {string | null} type
- * @property {string | null} name
- * @property {string | null} id
  */
 
 /**
@@ -73,10 +68,8 @@ export function shouldIncludePageScreenshot(page, hasNavigated = false) {
  * @typedef {Object} PageObservation
  * @property {string} url
  * @property {string} title
- * @property {PageElementSnapshot[]} elements
+ * @property {PageElement[]} elements
  * @property {ElementsPageMeta} elementsPage
- * @property {PageElementSnapshot[]} visibleElements
- * @property {ElementsPageMeta} visibleElementsPage
  * @property {string | null} pickedSelector
  * @property {*} lastResult
  * @property {string} [screenshot]
@@ -107,17 +100,21 @@ export function buildElementsPageMeta(total, offset, limit) {
 
 /**
  * @param {import('puppeteer').Page} page
- * @param {{ mode?: 'interactive' | 'tags', tags?: string[], offset?: number, limit?: number }} [options]
- * @returns {Promise<{ elements: PageElementSnapshot[], elementsPage: ElementsPageMeta }>}
+ * @param {{ offset?: number, limit?: number }} [options]
+ * @returns {Promise<{ elements: PageElement[], elementsPage: ElementsPageMeta }>}
  */
-export async function collectVisibleElements(page, options = {}) {
-	const mode = options.mode ?? 'interactive'
+export async function collectPageElements(page, options = {}) {
 	const offset = options.offset ?? 0
 	const limit = options.limit ?? resolveElementPageSize()
-	const tags = options.tags ?? []
 
 	const { elements, total } = await page.evaluate(
-		({ collectionMode, probeTags, elementOffset, elementLimit }) => {
+		({ elementOffset, elementLimit }) => {
+			const nonRenderedAncestorSelector = 'script, style, noscript, template, head'
+			const interactiveSelector =
+				'a, button, input, textarea, select, [role="button"]'
+			const readableSelector =
+				'h1, h2, h3, h4, h5, h6, p, li, label, time, td, th'
+
 			/**
 			 * @param {Element} element
 			 * @returns {string}
@@ -177,34 +174,59 @@ export async function collectVisibleElements(page, options = {}) {
 				return rect.width > 0 && rect.height > 0
 			}
 
+			/**
+			 * @param {Element} element
+			 * @returns {boolean}
+			 */
+			const isCollectableBodyElement = (element) => {
+				const body = document.body
+
+				if (!body || !body.contains(element)) {
+					return false
+				}
+
+				return !element.closest(nonRenderedAncestorSelector)
+			}
+
 			const elementText = (element) =>
 				(element.textContent || element.value || element.getAttribute('aria-label') || '')
 					.trim()
 					.slice(0, 120)
 
-			/** @type {NodeListOf<Element>} */
-			let nodes
+			const isInteractive = (element) => element.matches(interactiveSelector)
 
-			if (collectionMode === 'interactive') {
-				nodes = document.querySelectorAll(
-					'a, button, input, textarea, select, [role="button"]',
-				)
-			} else {
-				nodes = document.querySelectorAll(probeTags.join(', '))
+			const body = document.body
+
+			if (!body) {
+				return { elements: [], total: 0 }
 			}
 
-			const all = Array.from(nodes)
+			const seen = new Set()
+			/** @type {Element[]} */
+			const merged = []
+
+			for (const element of body.querySelectorAll(
+				`${interactiveSelector}, ${readableSelector}`,
+			)) {
+				if (seen.has(element)) {
+					continue
+				}
+
+				seen.add(element)
+				merged.push(element)
+			}
+
+			const all = merged
+				.filter(isCollectableBodyElement)
 				.filter(isVisible)
-				.filter((element) => collectionMode === 'interactive' || elementText(element).length > 0)
-				.map((element, globalIndex) => ({
-					index: globalIndex,
+				.filter((element) => isInteractive(element) || elementText(element).length > 0)
+				.filter(
+					(element) =>
+						!merged.some((other) => other !== element && element.contains(other)),
+				)
+				.map((element) => ({
 					selector: buildSelector(element),
-					tag: element.tagName.toLowerCase(),
 					text: elementText(element),
-					href: element instanceof HTMLAnchorElement ? element.href : null,
-					type: element instanceof HTMLInputElement ? element.type : null,
-					name: element.getAttribute('name'),
-					id: element.id || null,
 				}))
 
 			return {
@@ -213,8 +235,6 @@ export async function collectVisibleElements(page, options = {}) {
 			}
 		},
 		{
-			collectionMode: mode,
-			probeTags: tags,
 			elementOffset: offset,
 			elementLimit: limit,
 		},
@@ -229,62 +249,42 @@ export async function collectVisibleElements(page, options = {}) {
 /**
  * @param {import('puppeteer').Page} page
  * @param {{ offset?: number, limit?: number }} [options]
- * @returns {Promise<{ elements: PageElementSnapshot[], elementsPage: ElementsPageMeta }>}
+ * @returns {Promise<{ elements: PageElement[], elementsPage: ElementsPageMeta }>}
  */
 export async function collectInteractiveElements(page, options = {}) {
-	return collectVisibleElements(page, { ...options, mode: 'interactive' })
+	return collectPageElements(page, options)
 }
 
 /**
  * @param {import('puppeteer').Page} page
- * @param {{ offset?: number, limit?: number }} [params]
- * @returns {Promise<{ elements: PageElementSnapshot[], elementsPage: ElementsPageMeta }>}
+ * @param {{ offset?: number, limit?: number }} params
+ * @returns {Promise<{ offset: number, elements: PageElement[], elementsPage: ElementsPageMeta }>}
  */
-export async function listElements(page, params = {}) {
-	const limit = params.limit ?? resolveElementPageSize()
-	const offset = resolveElementOffset(params.offset)
-
-	return collectInteractiveElements(page, { offset, limit })
-}
-
-/**
- * @param {import('puppeteer').Page} page
- * @param {{ tags: string[], offset?: number, limit?: number }} params
- * @returns {Promise<{ tags: string[], offset: number, elements: PageElementSnapshot[], elementsPage: ElementsPageMeta }>}
- */
-export async function paginateVisibleElements(page, params) {
-	const state = resolveVisibleElementListState(createDefaultVisibleElementListState(), params)
+export async function paginateElements(page, params = {}) {
+	const state = resolveInteractiveElementListState(createDefaultInteractiveElementListState(), params)
 	const limit = params.limit ?? resolveElementPageSize()
 	const offset = resolveElementOffset(state.offset)
-	const { elements, elementsPage } = await collectVisibleElements(page, {
-		mode: 'tags',
-		tags: state.tags,
-		offset,
-		limit,
-	})
+	const { elements, elementsPage } = await collectPageElements(page, { offset, limit })
 
-	return {
-		tags: state.tags,
-		offset,
-		elements,
-		elementsPage,
-	}
+	return { offset, elements, elementsPage }
 }
 
 /**
+ * Rebuild knownSelectors from the live page after a page-changing action.
  * @param {import('puppeteer').Page} page
- * @param {{ tags: string[], offset?: number, limit?: number }} params
- * @returns {Promise<{ tags: string[], elements: PageElementSnapshot[], elementsPage: ElementsPageMeta }>}
- * @deprecated Use paginateVisibleElements instead.
+ * @param {ReturnType<import('../../packages/core/brain/BrainFactory.js').default['create']>} brain
+ * @param {Set<string>} knownSelectors
  */
-export async function listVisibleElements(page, params) {
-	const result = await paginateVisibleElements(page, params)
+export async function refreshKnownSelectorsFromPage(page, brain, knownSelectors) {
+	knownSelectors.clear()
 
-	return {
-		tags: result.tags,
-		elements: result.elements,
-		elementsPage: result.elementsPage,
-	}
+	const limit = resolveElementPageSize()
+	const elementState = brain.run.elementList ?? createDefaultInteractiveElementListState()
+	const { elements } = await collectPageElements(page, {
+		offset: elementState.offset,
+		limit,
+	})
+	registerObservationSelectors(knownSelectors, elements)
 }
 
 /**
@@ -366,7 +366,7 @@ export async function inspectElement(page, client, params) {
  * @property {AgentObservationCache} [cache]
  * @property {boolean} [cacheEnabled]
  * @property {ReturnType<import('../../packages/core/brain/BrainFactory.js').default['create']>} [brain]
- * @property {import('./visibleElementProbe.js').VisibleElementListState} [visibleElementList]
+ * @property {import('./interactiveElementList.js').InteractiveElementListState} [elementList]
  */
 
 /**
@@ -383,7 +383,8 @@ export async function observePage(page, brain, options = {}) {
 	const cacheEnabled = options.cacheEnabled ?? isObservationCacheEnabled()
 	const pageSize = resolveElementPageSize()
 	const fingerprint = await computePageFingerprint(page)
-	const domCacheKey = buildDomCacheKey(fingerprint)
+	const elementList = options.elementList ?? createDefaultInteractiveElementListState()
+	const domCacheKey = `${buildDomCacheKey(fingerprint)}|e:${elementList.offset}`
 
 	let elements
 	let elementsPage
@@ -393,8 +394,8 @@ export async function observePage(page, brain, options = {}) {
 		;({ elements, elementsPage } = options.cache.getDom(domCacheKey))
 		domCached = true
 	} else {
-		;({ elements, elementsPage } = await collectInteractiveElements(page, {
-			offset: 0,
+		;({ elements, elementsPage } = await collectPageElements(page, {
+			offset: elementList.offset,
 			limit: pageSize,
 		}))
 
@@ -403,23 +404,12 @@ export async function observePage(page, brain, options = {}) {
 		}
 	}
 
-	const visibleElementList = options.visibleElementList ?? createDefaultVisibleElementListState()
-	const { elements: visibleElements, elementsPage: visibleElementsPage } =
-		await collectVisibleElements(page, {
-			mode: 'tags',
-			tags: visibleElementList.tags,
-			offset: visibleElementList.offset,
-			limit: pageSize,
-		})
-
 	/** @type {PageObservation} */
 	const observation = {
 		url: page.url(),
 		title: await page.title(),
 		elements,
 		elementsPage,
-		visibleElements,
-		visibleElementsPage,
 		pickedSelector: options.brain?.run?.pickedSelector ?? null,
 		lastResult: brain.recall(constants.inputKey),
 		tabs: await listAgentTabs(brain),

@@ -1,8 +1,22 @@
 import test from 'node:test'
 import assert from 'node:assert'
-import { mustPickBeforeAnswer, PICK_CONTEXT_ACTIONS } from '../../src/agent/agentPick.js'
+import { mustPickBeforeAnswer } from '../../src/agent/agentEnvironment.js'
 
-test('mustPickBeforeAnswer requires a pick after selector-context actions', () => {
+test('mustPickBeforeAnswer requires pick after navigate when exporting', () => {
+	assert.strictEqual(
+		mustPickBeforeAnswer([{ action: 'navigate', params: { url: 'https://example.com' } }], null, true),
+		true,
+	)
+})
+
+test('mustPickBeforeAnswer skips pick requirement outside export mode', () => {
+	assert.strictEqual(
+		mustPickBeforeAnswer([{ action: 'navigate', params: { url: 'https://example.com' } }], null, false),
+		false,
+	)
+})
+
+test('mustPickBeforeAnswer allows answer after getElements without pick', () => {
 	assert.strictEqual(
 		mustPickBeforeAnswer(
 			[
@@ -10,34 +24,19 @@ test('mustPickBeforeAnswer requires a pick after selector-context actions', () =
 				{ action: 'getElements', params: { selector: 'h1' } },
 			],
 			null,
+			true,
 		),
-		true,
-	)
-})
-
-test('mustPickBeforeAnswer requires a pick after navigate', () => {
-	assert.strictEqual(
-		mustPickBeforeAnswer([{ action: 'navigate', params: { url: 'https://example.com' } }], null, {
-			hasNavigated: true,
-		}),
-		true,
-	)
-})
-
-test('mustPickBeforeAnswer allows pre-navigate answers without a pick', () => {
-	assert.strictEqual(
-		mustPickBeforeAnswer([{ action: 'navigate', params: { url: 'https://example.com' } }], null),
 		false,
 	)
 })
 
 test('mustPickBeforeAnswer clears once a pick is active', () => {
 	assert.strictEqual(
-		mustPickBeforeAnswer([{ action: 'getElements', params: { selector: 'h1' } }], 'h1'),
+		mustPickBeforeAnswer([{ action: 'navigate', params: { url: 'https://example.com' } }], 'h1', true),
 		false,
 	)
 })
 
-test('PICK_CONTEXT_ACTIONS includes paginateVisibleElements', () => {
-	assert.strictEqual(PICK_CONTEXT_ACTIONS.has('paginateVisibleElements'), true)
+test('mustPickBeforeAnswer allows answers without navigate', () => {
+	assert.strictEqual(mustPickBeforeAnswer([], null, true), false)
 })

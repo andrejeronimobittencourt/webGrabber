@@ -5,7 +5,6 @@ import { ActionList, ActionListContainer } from '../packages/core/actions/Action
 import CliPresenter from '../src/infrastructure/presenter/CliPresenter.js'
 import { createTestBrain } from './helpers/createTestBrain.js'
 import { setPresenter } from '../src/infrastructure/presenter/present.js'
-import { removeOutputDir } from './helpers/cleanupOutput.js'
 
 test('GrabList preserves verbose from grab config', () => {
 	const grabList = GrabListFactory.create()
@@ -76,7 +75,6 @@ test(
 				/Action nonexistentAction not found/,
 			)
 		} finally {
-			await removeOutputDir('failing-grab')
 			try {
 				await puppeteerModule.default.close()
 			} catch {

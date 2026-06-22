@@ -4,9 +4,8 @@ import {
 	buildElementsPageMeta,
 	collectInteractiveElements,
 	isAgentPreNavigatePageUrl,
-	listElements,
+	paginateElements,
 	observePage,
-	paginateVisibleElements,
 	shouldIncludePageScreenshot,
 } from '../../src/agent/observePage.js'
 
@@ -42,18 +41,32 @@ test('buildElementsPageMeta calculates pageIndex for later offsets', () => {
 	assert.strictEqual(meta.hasMore, false)
 })
 
+test('collectInteractiveElements scopes collection to visible body content', async () => {
+	/** @type {((args: object) => unknown) | null} */
+	let browserCollector = null
+	const page = {
+		async evaluate(fn, args) {
+			browserCollector = fn
+
+			return { elements: [], total: 0 }
+		},
+	}
+
+	await collectInteractiveElements(page)
+
+	assert.ok(browserCollector)
+	assert.match(String(browserCollector), /document\.body/)
+	assert.match(String(browserCollector), /isCollectableBodyElement/)
+	assert.match(String(browserCollector), /script, style, noscript, template, head/)
+	assert.match(String(browserCollector), /readableSelector/)
+})
+
 test('collectInteractiveElements returns paginated elements with selectors', async () => {
 	const page = {
 		async evaluate(_fn, { elementOffset, elementLimit }) {
 			const all = Array.from({ length: 5 }, (_, index) => ({
-				index,
 				selector: `#item-${index}`,
-				tag: 'button',
 				text: `Item ${index}`,
-				href: null,
-				type: null,
-				name: null,
-				id: `item-${index}`,
 			}))
 
 			return {
@@ -73,84 +86,65 @@ test('collectInteractiveElements returns paginated elements with selectors', asy
 	assert.strictEqual(result.elementsPage.hasMore, true)
 })
 
-test('paginateVisibleElements returns visible readable elements for requested tags', async () => {
-	const page = {
-		async evaluate(_fn, { collectionMode, probeTags, elementOffset, elementLimit }) {
-			assert.strictEqual(collectionMode, 'tags')
-			assert.deepStrictEqual(probeTags, ['p', 'h1'])
-
-			const all = [
-				{
-					index: 0,
-					selector: 'h1',
-					tag: 'h1',
-					text: 'Current time',
-					href: null,
-					type: null,
-					name: null,
-					id: null,
-				},
-				{
-					index: 1,
-					selector: 'p.result',
-					tag: 'p',
-					text: '3:45 PM',
-					href: null,
-					type: null,
-					name: null,
-					id: null,
-				},
-			]
-
-			return {
-				elements: all.slice(elementOffset, elementOffset + elementLimit),
-				total: all.length,
-			}
-		},
-	}
-
-	const result = await paginateVisibleElements(page, { tags: ['p', 'h1'], offset: 0 })
-
-	assert.deepStrictEqual(result.tags, ['p', 'h1'])
-	assert.strictEqual(result.elements.length, 2)
-	assert.strictEqual(result.elements[1].text, '3:45 PM')
-})
-
-test('listElements defaults offset to 0', async () => {
+test('paginateElements defaults offset to 0', async () => {
 	const page = {
 		async evaluate(_fn, { elementOffset, elementLimit }) {
 			assert.strictEqual(elementOffset, 0)
-			assert.strictEqual(elementLimit, 100)
+			assert.strictEqual(elementLimit, 25)
 
 			return { elements: [], total: 0 }
 		},
 	}
 
-	const result = await listElements(page, {})
+	const result = await paginateElements(page, {})
 
+	assert.strictEqual(result.offset, 0)
 	assert.strictEqual(result.elements.length, 0)
 	assert.strictEqual(result.elementsPage.pageIndex, 0)
 })
 
-test('listElements rejects a negative offset', async () => {
+test('paginateElements rejects a negative offset', async () => {
 	const page = { async evaluate() {} }
 
-	await assert.rejects(() => listElements(page, { offset: -1 }), /non-negative integer/)
+	await assert.rejects(() => paginateElements(page, { offset: -1 }), /non-negative integer/)
 })
 
-test('paginateVisibleElements defaults offset to 0', async () => {
+test('observePage returns a single elements list', async () => {
+	let fingerprintStep = 0
 	const page = {
-		async evaluate(_fn, { elementOffset }) {
-			assert.strictEqual(elementOffset, 0)
+		url: () => 'https://example.com',
+		async title() {
+			return 'Example'
+		},
+		async evaluate(_fn, args) {
+			if (typeof args?.elementOffset === 'number') {
+				return {
+					elements: [
+						{ selector: 'textarea[name="q"]', text: '' },
+						{ selector: 'h1', text: 'Example Domain' },
+					],
+					total: 2,
+				}
+			}
 
-			return { elements: [], total: 0 }
+			fingerprintStep += 1
+			if (fingerprintStep % 2 === 1) {
+				return { scrollX: 0, scrollY: 0 }
+			}
+
+			return '2|TEXTAREA:q:|H1::Example Domain'
 		},
 	}
 
-	const result = await paginateVisibleElements(page, { tags: ['p'] })
+	const observation = await observePage(page, { recall: () => null }, {
+		includeScreenshot: false,
+	})
 
-	assert.deepStrictEqual(result.tags, ['p'])
-	assert.strictEqual(result.elements.length, 0)
+	assert.deepStrictEqual(observation.elements, [
+		{ selector: 'textarea[name="q"]', text: '' },
+		{ selector: 'h1', text: 'Example Domain' },
+	])
+	assert.strictEqual(observation.visibleElements, undefined)
 })
 
 test('shouldIncludePageScreenshot skips vision on pre-navigate blank pages', () => {

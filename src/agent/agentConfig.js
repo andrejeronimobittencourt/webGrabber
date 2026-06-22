@@ -1,5 +1,28 @@
-/** Default number of interactive elements per cheatsheet page. */
-export const DEFAULT_AGENT_ELEMENT_PAGE_SIZE = 100
+/** Default number of interactive elements per observation page. */
+export const DEFAULT_AGENT_ELEMENT_PAGE_SIZE = 25
+
+/** Agent tools that are exploration-only and should not be exported to grabs. */
+export const AGENT_ONLY_EXPORT_ACTIONS = new Set([
+	'inspectElement',
+	'paginateElements',
+	'listTabs',
+	'pickElement',
+	'switchTab',
+])
+
+/** Agent tools omitted from normal CLI progress output. */
+export const AGENT_QUIET_TOOLS = new Set(['pickElement'])
+
+/** Agent tools that consume a pick for interaction rather than read-and-answer export. */
+export const PICK_CONSUMING_ACTIONS = new Set(['click', 'inspectElement', 'pressKey', 'type'])
+
+/** Agent tools after which knownSelectors should be rebuilt from the live page. */
+export const KNOWN_SELECTOR_REFRESH_TOOLS = new Set([
+	'click',
+	'navigate',
+	'pressKey',
+	'switchTab',
+])
 
 /**
  * Resolve the interactive-element page size for agent observations.
@@ -40,4 +63,12 @@ export function isObservationCacheEnabled() {
 	}
 
 	return value === 'true'
+}
+
+/**
+ * @param {string} toolName
+ * @returns {boolean}
+ */
+export function shouldRefreshKnownSelectorsAfterTool(toolName) {
+	return KNOWN_SELECTOR_REFRESH_TOOLS.has(toolName)
 }

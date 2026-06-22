@@ -5,8 +5,8 @@ output/*
 !grabs/.gitkeep
 !output/.gitkeep
 .DS_Store
-logs/
-*.log
+logs/*
+!logs/.gitkeep
 docs/.vitepress/cache
 docs/.vitepress/dist
 .cursor

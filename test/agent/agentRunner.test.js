@@ -53,45 +53,22 @@ class MockPage {
 	}
 
 	async evaluate(_fn, args) {
-		if (args && args.collectionMode === 'tags') {
-			return {
-				elements: [
-					{
-						index: 0,
-						selector: 'h1',
-						tag: 'h1',
-						text: 'Example Domain',
-						href: null,
-						type: null,
-						name: null,
-						id: null,
-					},
-					{
-						index: 1,
-						selector: 'p',
-						tag: 'p',
-						text: 'More information...',
-						href: null,
-						type: null,
-						name: null,
-						id: null,
-					},
-				],
-				total: 2,
-			}
-		}
-
 		if (args && typeof args.elementOffset === 'number') {
+			if (args.elementOffset === 0) {
+				return {
+					elements: [
+						{ selector: 'textarea[name="q"]', text: '' },
+						{ selector: 'h1', text: 'Example Domain' },
+						{ selector: 'p', text: 'More information...' },
+					],
+					total: 3,
+				}
+			}
+
 			const total = 150
 			const element = {
-				index: args.elementOffset,
 				selector: `#item-${args.elementOffset}`,
-				tag: 'button',
 				text: `Item ${args.elementOffset}`,
-				href: null,
-				type: null,
-				name: null,
-				id: `item-${args.elementOffset}`,
 			}
 
 			return {
@@ -191,23 +168,8 @@ test('AgentRunner returns final answer after tool execution', async () => {
 							id: 'call-1',
 							type: 'function',
 							function: {
-								name: 'pickElement',
-								arguments: JSON.stringify({ selector: '#item-0' }),
-							},
-						},
-					],
-				},
-			},
-			{
-				message: {
-					role: 'assistant',
-					tool_calls: [
-						{
-							id: 'call-2',
-							type: 'function',
-							function: {
 								name: 'getElements',
-								arguments: JSON.stringify({ selector: '#item-0' }),
+								arguments: JSON.stringify({ selector: 'h1' }),
 							},
 						},
 					],
@@ -225,9 +187,8 @@ test('AgentRunner returns final answer after tool execution', async () => {
 	const result = await runner.run('Get the h1 text')
 
 	assert.strictEqual(result.answer, 'The h1 text is extracted-value.')
-	assert.strictEqual(result.steps.length, 2)
-	assert.strictEqual(result.steps[0].action, 'pickElement')
-	assert.strictEqual(result.steps[1].action, 'getElements')
+	assert.strictEqual(result.steps.length, 1)
+	assert.strictEqual(result.steps[0].action, 'getElements')
 	assert.strictEqual(result.memory.input, 'extracted-value')
 })
 
@@ -252,23 +213,8 @@ test('AgentRunner feeds tool errors back to the model and continues', async () =
 							id: 'call-1',
 							type: 'function',
 							function: {
-								name: 'pickElement',
-								arguments: JSON.stringify({ selector: '#item-0' }),
-							},
-						},
-					],
-				},
-			},
-			{
-				message: {
-					role: 'assistant',
-					tool_calls: [
-						{
-							id: 'call-2',
-							type: 'function',
-							function: {
 								name: 'getElements',
-								arguments: JSON.stringify({ selector: '#item-0' }),
+								arguments: JSON.stringify({ selector: 'h1' }),
 							},
 						},
 					],
@@ -286,28 +232,17 @@ test('AgentRunner feeds tool errors back to the model and continues', async () =
 	const result = await runner.run('Try and recover')
 
 	assert.strictEqual(result.answer, 'Recovered after the failed tool.')
-	assert.strictEqual(result.steps.length, 2)
-	assert.strictEqual(result.steps[1].error, 'Tool execution failed')
-	assert.deepStrictEqual(result.steps[1].result, { error: 'Tool execution failed' })
+	assert.strictEqual(result.steps.length, 1)
+	assert.strictEqual(result.steps[0].error, 'Tool execution failed')
+	assert.deepStrictEqual(result.steps[0].result, { error: 'Tool execution failed' })
 })
 
-test('AgentRunner feeds cheatsheet validation errors back to the model and continues', async () => {
+test('AgentRunner feeds observation validation errors back to the model and continues', async () => {
 	const page = new MockPage()
 	page.evaluate = async (_fn, args) => {
 		if (args && typeof args.elementOffset === 'number') {
 			return {
-				elements: [
-					{
-						index: 0,
-						selector: 'input[name="q"]',
-						tag: 'input',
-						text: '',
-						href: null,
-						type: 'search',
-						name: 'q',
-						id: null,
-					},
-				],
+				elements: [{ selector: 'input[name="q"]', text: '' }],
 				total: 1,
 			}
 		}
@@ -358,9 +293,11 @@ test('AgentRunner feeds cheatsheet validation errors back to the model and conti
 
 	assert.strictEqual(result.answer, 'Used getElements on the results tab instead.')
 	assert.strictEqual(result.steps.length, 1)
-	assert.match(result.steps[0].error ?? '', /not in the current element list/)
+	assert.match(result.steps[0].error ?? '', /not in the current observation/)
 	assert.match(result.steps[0].error ?? '', /div:nth-of-type\(2\)/)
-	assert.deepStrictEqual(result.steps[0].result, { error: result.steps[0].error })
+	assert.deepStrictEqual(result.steps[0].result.error, result.steps[0].error)
+	assert.ok(Array.isArray(result.steps[0].result.availableSelectors))
+	assert.ok(result.steps[0].result.availableSelectors.length > 0)
 })
 
 test('AgentRunner logs sanitized tool errors without selectors', async () => {
@@ -368,18 +305,7 @@ test('AgentRunner logs sanitized tool errors without selectors', async () => {
 	page.evaluate = async (_fn, args) => {
 		if (args && typeof args.elementOffset === 'number') {
 			return {
-				elements: [
-					{
-						index: 0,
-						selector: 'input[name="q"]',
-						tag: 'input',
-						text: '',
-						href: null,
-						type: 'search',
-						name: 'q',
-						id: null,
-					},
-				],
+				elements: [{ selector: 'input[name="q"]', text: '' }],
 				total: 1,
 			}
 		}
@@ -443,7 +369,7 @@ test('AgentRunner logs sanitized tool errors without selectors', async () => {
 
 	const combinedOutput = outputs.join('\n')
 	assert.match(combinedOutput, /Agent tool failed:/)
-	assert.match(combinedOutput, /Selector is not in the current element list/)
+	assert.match(combinedOutput, /Selector is not in the current observation/)
 	assert.doesNotMatch(combinedOutput, /div:nth-of-type\(2\)/)
 })
 
@@ -537,21 +463,6 @@ test('AgentRunner skips page vision before first navigate', async () => {
 			{
 				message: {
 					role: 'assistant',
-					tool_calls: [
-						{
-							id: 'call-2',
-							type: 'function',
-							function: {
-								name: 'pickElement',
-								arguments: JSON.stringify({ selector: 'h1' }),
-							},
-						},
-					],
-				},
-			},
-			{
-				message: {
-					role: 'assistant',
 					content: 'Navigation complete.',
 				},
 			},
@@ -593,7 +504,7 @@ test('AgentRunner skips page vision before first navigate', async () => {
 	}
 })
 
-test('AgentRunner executes listElements as an agent-native tool', async () => {
+test('AgentRunner executes paginateElements as an agent-native tool', async () => {
 	const previousVision = process.env.AGENT_VISION
 	process.env.AGENT_VISION = 'false'
 
@@ -609,7 +520,7 @@ test('AgentRunner executes listElements as an agent-native tool', async () => {
 								id: 'call-1',
 								type: 'function',
 								function: {
-									name: 'listElements',
+									name: 'paginateElements',
 									arguments: JSON.stringify({ offset: 100 }),
 								},
 							},
@@ -628,7 +539,7 @@ test('AgentRunner executes listElements as an agent-native tool', async () => {
 		const result = await runner.run('Find item on page 2')
 
 		assert.strictEqual(result.answer, 'Found the target on page 2.')
-		assert.strictEqual(result.steps[0].action, 'listElements')
+		assert.strictEqual(result.steps[0].action, 'paginateElements')
 		assert.ok(result.steps[0].result.elementsPage)
 	} finally {
 		if (previousVision === undefined) {
@@ -639,17 +550,17 @@ test('AgentRunner executes listElements as an agent-native tool', async () => {
 	}
 })
 
-test('AgentRunner requires pickElement before answering from visible text', async () => {
+test('AgentRunner requires pickElement before answering during export', async () => {
 	const engine = createMockEngine()
 	engine.perform = async (brain, name) => {
-		if (name === 'getElements') {
-			brain.recall = () => 'Example Domain'
+		if (name === 'puppeteer' || name === 'navigate') {
+			brain.browser.activePage.setUrl('https://example.com')
 		}
 	}
 
 	const runner = new AgentRunner(createRunnerOptions({
 		engine,
-		policy: new AgentPolicy({ maxSteps: 8 }),
+		policy: new AgentPolicy({ maxSteps: 8, exportMode: true }),
 		client: new MockOllamaClient([
 			{
 				message: {
@@ -669,42 +580,18 @@ test('AgentRunner requires pickElement before answering from visible text', asyn
 			{
 				message: {
 					role: 'assistant',
+					content: 'Example Domain',
+				},
+			},
+			{
+				message: {
+					role: 'assistant',
 					tool_calls: [
 						{
 							id: 'call-2',
 							type: 'function',
 							function: {
-								name: 'getElements',
-								arguments: JSON.stringify({ selector: 'h1' }),
-							},
-						},
-					],
-				},
-			},
-			{
-				message: {
-					role: 'assistant',
-					tool_calls: [
-						{
-							id: 'call-3',
-							type: 'function',
-							function: {
 								name: 'pickElement',
-								arguments: JSON.stringify({ selector: 'h1' }),
-							},
-						},
-					],
-				},
-			},
-			{
-				message: {
-					role: 'assistant',
-					tool_calls: [
-						{
-							id: 'call-4',
-							type: 'function',
-							function: {
-								name: 'getElements',
 								arguments: JSON.stringify({ selector: 'h1' }),
 							},
 						},
@@ -720,10 +607,117 @@ test('AgentRunner requires pickElement before answering from visible text', asyn
 		]),
 	}))
 
-	const result = await runner.run('Return the h1 text')
+	const result = await runner.run('Return the page heading', {
+		exportGrabName: 'heading-export',
+		exportOverwrite: true,
+	})
 
 	assert.strictEqual(result.answer, 'Example Domain')
-	assert.match(result.steps[1].error ?? '', /pickElement/)
-	assert.strictEqual(result.steps[2].action, 'pickElement')
-	assert.strictEqual(result.steps[3].action, 'getElements')
+	assert.strictEqual(result.steps[0].action, 'navigate')
+	assert.strictEqual(result.steps[1].action, 'pickElement')
+})
+
+test('AgentRunner allows type without pickElement after navigate', async () => {
+	const engine = createMockEngine()
+	engine.perform = async (brain, name) => {
+		if (name === 'puppeteer' || name === 'navigate') {
+			brain.browser.activePage.setUrl('https://duckduckgo.com')
+		}
+	}
+
+	const runner = new AgentRunner(createRunnerOptions({
+		engine,
+		policy: new AgentPolicy({ maxSteps: 6 }),
+		client: new MockOllamaClient([
+			{
+				message: {
+					role: 'assistant',
+					tool_calls: [
+						{
+							id: 'call-1',
+							type: 'function',
+							function: {
+								name: 'navigate',
+								arguments: JSON.stringify({ url: 'https://duckduckgo.com' }),
+							},
+						},
+					],
+				},
+			},
+			{
+				message: {
+					role: 'assistant',
+					tool_calls: [
+						{
+							id: 'call-2',
+							type: 'function',
+							function: {
+								name: 'type',
+								arguments: JSON.stringify({
+									selector: 'textarea[name="q"]',
+									text: 'world cup 2026',
+								}),
+							},
+						},
+					],
+				},
+			},
+			{
+				message: {
+					role: 'assistant',
+					tool_calls: [
+						{
+							id: 'call-3',
+							type: 'function',
+							function: {
+								name: 'pressKey',
+								arguments: JSON.stringify({
+									key: 'Enter',
+									selector: 'textarea[name="q"]',
+								}),
+							},
+						},
+					],
+				},
+			},
+			{
+				message: {
+					role: 'assistant',
+					content: 'Typed the search query.',
+				},
+			},
+		]),
+	}))
+
+	const result = await runner.run('Search duckduckgo')
+
+	assert.strictEqual(result.steps[1].action, 'type')
+	assert.strictEqual(result.steps[1].error, null)
+	assert.strictEqual(result.answer, 'Typed the search query.')
+})
+
+test('AgentRunner retries when the model returns an empty assistant turn', async () => {
+	const runner = new AgentRunner(createRunnerOptions({
+		policy: new AgentPolicy({ maxSteps: 5 }),
+		client: new MockOllamaClient([
+			{
+				message: {
+					role: 'assistant',
+					content: '',
+					reasoning: 'Thinking only, no answer yet.',
+				},
+			},
+			{
+				message: {
+					role: 'assistant',
+					content: 'Recovered after empty response.',
+				},
+			},
+		]),
+	}))
+
+	const result = await runner.run('Return a short answer')
+
+	assert.strictEqual(result.answer, 'Recovered after empty response.')
+	assert.strictEqual(result.steps.length, 0)
 })

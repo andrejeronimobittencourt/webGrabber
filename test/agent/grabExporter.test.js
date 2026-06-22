@@ -77,7 +77,7 @@ test('exportGrabFromSteps omits failed steps', () => {
 test('exportGrabFromSteps omits agent-only exploration steps', () => {
 	const grab = exportGrabFromSteps([
 		{
-			action: 'listElements',
+			action: 'paginateElements',
 			params: { offset: 100 },
 		},
 		{
@@ -97,14 +97,14 @@ test('exportGrabFromSteps omits agent-only exploration steps', () => {
 	})
 })
 
-test('exportGrabFromSteps omits visible list and pick steps from export', () => {
+test('exportGrabFromSteps omits pagination and pick steps from export', () => {
 	const grab = exportGrabFromSteps([
 		{
 			action: 'navigate',
 			params: { url: 'https://example.com' },
 		},
 		{
-			action: 'paginateVisibleElements',
+			action: 'paginateElements',
 			params: { offset: 0 },
 		},
 		{
@@ -316,7 +316,7 @@ test('exportAgentRunGrab rejects runs with no exportable actions', async () => {
 			exportAgentRunGrab({
 				steps: [
 					{
-						action: 'listElements',
+						action: 'paginateElements',
 						params: { offset: 0 },
 						result: { elements: [] },
 					},

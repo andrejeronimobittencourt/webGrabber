@@ -4,16 +4,13 @@ export const BUILTIN_AGENT_TOOL_NAMES = [
 	'click',
 	'type',
 	'pressKey',
-	'listElements',
-	'paginateVisibleElements',
-	'pickElement',
+	'paginateElements',
 	'inspectElement',
 	'listTabs',
 	'switchTab',
 	'getElements',
-	'elementExists',
 	'screenshot',
-	'setVariable',
-	'getVariable',
-	'log',
 ]
+
+/** Agent tools included only when exporting a grab from an agent run. */
+export const EXPORT_AGENT_TOOL_NAMES = ['pickElement']

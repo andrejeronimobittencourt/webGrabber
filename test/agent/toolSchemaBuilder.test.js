@@ -1,7 +1,10 @@
 import test from 'node:test'
 import assert from 'node:assert'
 import { buildAgentTools, listAgentToolNames } from '../../src/agent/ToolSchemaBuilder.js'
-import { BUILTIN_AGENT_TOOL_NAMES } from '../../packages/core/utils/builtinAgentToolNames.js'
+import {
+	BUILTIN_AGENT_TOOL_NAMES,
+	EXPORT_AGENT_TOOL_NAMES,
+} from '../../packages/core/utils/builtinAgentToolNames.js'
 
 test('buildAgentTools returns OpenAI-compatible tool definitions', () => {
 	const tools = buildAgentTools()
@@ -22,6 +25,17 @@ test('listAgentToolNames includes navigate and blocks raw puppeteer', () => {
 	assert.ok(names.includes('navigate'))
 	assert.ok(!names.includes('puppeteer'))
 	assert.ok(!names.includes('login'))
+	assert.ok(!names.includes('pickElement'))
+})
+
+test('listAgentToolNames includes pickElement only during export', () => {
+	const names = listAgentToolNames({ exportMode: true })
+
+	assert.ok(names.includes('pickElement'))
+	assert.deepStrictEqual(
+		[...names].sort(),
+		[...BUILTIN_AGENT_TOOL_NAMES, ...EXPORT_AGENT_TOOL_NAMES].sort(),
+	)
 })
 
 test('navigate tool requires url parameter', () => {
@@ -32,26 +46,51 @@ test('navigate tool requires url parameter', () => {
 	assert.deepStrictEqual(navigate.function.parameters.required, ['url'])
 })
 
-test('listElements and paginateVisibleElements treat offset as optional', () => {
+test('click tool requires selector only', () => {
 	const tools = buildAgentTools()
-	const listElements = tools.find((tool) => tool.function.name === 'listElements')
-	const paginateVisibleElements = tools.find(
-		(tool) => tool.function.name === 'paginateVisibleElements',
+	const click = tools.find((tool) => tool.function.name === 'click')
+
+	assert.ok(click)
+	assert.deepStrictEqual(click.function.parameters.required, ['selector'])
+	assert.strictEqual(click.function.parameters.properties.text, undefined)
+})
+
+test('paginateElements treats offset as optional', () => {
+	const tools = buildAgentTools()
+	const paginateElements = tools.find((tool) => tool.function.name === 'paginateElements')
+
+	assert.ok(paginateElements)
+	assert.deepStrictEqual(paginateElements.function.parameters.required, [])
+	assert.match(
+		paginateElements.function.parameters.properties.offset.description,
+		/nextOffset/,
 	)
+})
+
+test('buildAgentTools includes pickElement only during export', () => {
+	const tools = buildAgentTools({ exportMode: true })
 	const pickElement = tools.find((tool) => tool.function.name === 'pickElement')
 
-	assert.ok(listElements)
-	assert.ok(paginateVisibleElements)
 	assert.ok(pickElement)
-	assert.deepStrictEqual(listElements.function.parameters.required, [])
-	assert.deepStrictEqual(paginateVisibleElements.function.parameters.required, [])
 	assert.deepStrictEqual(pickElement.function.parameters.required, ['selector'])
-	assert.match(
-		listElements.function.parameters.properties.offset.description,
-		/Defaults to 0/,
-	)
-	assert.match(
-		paginateVisibleElements.function.parameters.properties.offset.description,
-		/Defaults to the current page/,
-	)
+	assert.strictEqual(buildAgentTools().some((tool) => tool.function.name === 'pickElement'), false)
+})
+
+test('buildAgentTools describes screenshot as user-only when vision is disabled', () => {
+	const tools = buildAgentTools({ visionAvailable: false })
+	const screenshot = tools.find((tool) => tool.function.name === 'screenshot')
+	const inspectElement = tools.find((tool) => tool.function.name === 'inspectElement')
+
+	assert.match(screenshot.function.description, /for the user only/)
+	assert.match(screenshot.function.description, /cannot see/)
+	assert.match(inspectElement.function.description, /Vision is not enabled/)
+})
+
+test('buildAgentTools updates vision tool descriptions when vision is enabled', () => {
+	const tools = buildAgentTools({ visionAvailable: true })
+	const screenshot = tools.find((tool) => tool.function.name === 'screenshot')
+	const inspectElement = tools.find((tool) => tool.function.name === 'inspectElement')
+
+	assert.match(screenshot.function.description, /for the user/)
+	assert.match(inspectElement.function.description, /vision summary/)
 })

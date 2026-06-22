@@ -1,16 +1,6 @@
 import winston from 'winston'
 import path from 'path'
-import { fileURLToPath } from 'url'
-import fs from 'fs'
-
-const __filename = fileURLToPath(import.meta.url)
-const __dirname = path.dirname(__filename)
-
-// Create logs directory if it doesn't exist
-const logsDir = path.join(__dirname, '../../logs')
-if (!fs.existsSync(logsDir)) {
-	fs.mkdirSync(logsDir, { recursive: true })
-}
+import { LOGS_DIR } from './projectPaths.js'
 
 /**
  * Custom log format
@@ -51,13 +41,13 @@ const logger = winston.createLogger({
 		}),
 		// Write all logs to file
 		new winston.transports.File({
-			filename: path.join(logsDir, 'error.log'),
+			filename: path.join(LOGS_DIR, 'error.log'),
 			level: 'error',
 			maxsize: 5242880, // 5MB
 			maxFiles: 5,
 		}),
 		new winston.transports.File({
-			filename: path.join(logsDir, 'combined.log'),
+			filename: path.join(LOGS_DIR, 'combined.log'),
 			maxsize: 5242880, // 5MB
 			maxFiles: 5,
 		}),

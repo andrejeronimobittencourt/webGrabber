@@ -5,7 +5,7 @@ import {
 	bindAgentTabSync,
 	syncAgentBrowserTabs,
 	unbindAgentTabSync,
-} from '../../src/agent/AgentTabSync.js'
+} from '../../src/agent/agentTabs.js'
 
 test('adoptAgentPage registers and activates a new tab', async () => {
 	const brain = {
