@@ -1,3 +1,4 @@
+import { delayMs } from '../../packages/core/utils/delayMs.js'
 import { safePageUrl } from '../../packages/core/utils/safePageUrl.js'
 
 /**
@@ -20,20 +21,31 @@ export async function waitForAgentPageSettle(page, options = {}) {
 
 	while (Date.now() - start < timeout) {
 		try {
-			const readyState = await page.evaluate(() => document.readyState)
+			const remaining = timeout - (Date.now() - start)
 
-			if (readyState === 'complete' || readyState === 'interactive') {
-				break
+			if (typeof page.waitForFunction === 'function') {
+				await page.waitForFunction(
+					() =>
+						document.readyState === 'complete' ||
+						document.readyState === 'interactive',
+					{ timeout: Math.max(remaining, 1) },
+				)
+			} else {
+				const readyState = await page.evaluate(() => document.readyState)
+
+				if (readyState === 'complete' || readyState === 'interactive') {
+					break
+				}
 			}
 
-			if (readyState !== 'loading') {
-				break
-			}
+			break
 		} catch {
-			continue
-		}
+			if (Date.now() - start >= timeout) {
+				break
+			}
 
-		await new Promise((resolve) => setTimeout(resolve, 100))
+			await delayMs(100)
+		}
 	}
 
 	try {

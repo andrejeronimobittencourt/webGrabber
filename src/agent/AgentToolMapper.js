@@ -9,6 +9,7 @@ export const DEFAULT_AGENT_NAVIGATE_WAIT_UNTIL = 'domcontentloaded'
  * @property {string | null} [error]
  * @property {boolean} [madeProgress]
  * @property {string} [pageUrl]
+ * @property {string} [requestedAction]
  * @property {string} [timestamp]
  */
 

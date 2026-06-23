@@ -21,12 +21,12 @@ test('buildObservationFingerprint changes when elements change', () => {
 	const before = buildObservationFingerprint({
 		url: 'https://example.com',
 		title: 'Example',
-		elements: [{ selector: 'h1', text: 'Hello' }],
+		elements: [{ selector: 'h1', text: 'Hello', interactable: false }],
 	})
 	const after = buildObservationFingerprint({
 		url: 'https://example.com',
 		title: 'Example',
-		elements: [{ selector: 'h1', text: 'Hello world' }],
+		elements: [{ selector: 'h1', text: 'Hello world', interactable: false }],
 	})
 
 	assert.strictEqual(observationFingerprintsEqual(before, after), false)
@@ -106,7 +106,7 @@ test('buildRepeatedStalledActionFeedback returns runtime guidance', () => {
 	])
 
 	assert.match(String(feedback), /click with the same parameters was tried 2 times/)
-	assert.match(String(feedback), /different tool or different parameters/)
+	assert.match(String(feedback), /without observation change/)
 })
 
 test('findConsecutiveSameToolOnSamePage detects paginate loops on one page', () => {

@@ -3,6 +3,7 @@ import { AgentValidationError } from './agentErrors.js'
 import { findElementsByText } from './agentObservationFormat.js'
 import { validateGrabParameters } from '../../packages/core/grabParameters.js'
 import { BUILTIN_AGENT_TOOL_NAMES, EXPORT_AGENT_TOOL_NAMES, VISION_AGENT_TOOL_NAMES } from '../../packages/core/utils/builtinAgentToolNames.js'
+import { suggestAgentToolName } from './agentToolNameResolver.js'
 
 /**
  * @typedef {import('./agentDynamicTools.js').DynamicToolRegistryEntry} DynamicToolRegistryEntry
@@ -23,6 +24,12 @@ const REQUIRED_SELECTOR_ACTIONS = new Set([
 	'type',
 ])
 
+const INTERACTION_SELECTOR_ACTIONS = new Set([
+	'click',
+	'pressKey',
+	'type',
+])
+
 /**
  * Safety policy for agent tool execution.
  */
@@ -32,6 +39,8 @@ export default class AgentPolicy {
 	#dynamicRegistry
 	#exportMode
 	#visionAvailable
+	#allowedToolNames
+	#allowedToolNameSet
 
 	/**
 	 * @param {{ maxSteps?: number, allowedHosts?: string[], dynamicRegistry?: Map<string, DynamicToolRegistryEntry>, exportMode?: boolean, visionAvailable?: boolean }} [options]
@@ -48,6 +57,13 @@ export default class AgentPolicy {
 		this.#dynamicRegistry = options.dynamicRegistry ?? new Map()
 		this.#exportMode = options.exportMode ?? false
 		this.#visionAvailable = options.visionAvailable ?? false
+		this.#allowedToolNames = [
+			...BUILTIN_AGENT_TOOL_NAMES,
+			...(this.#visionAvailable ? VISION_AGENT_TOOL_NAMES : []),
+			...(this.#exportMode ? EXPORT_AGENT_TOOL_NAMES : []),
+			...this.#dynamicRegistry.keys(),
+		]
+		this.#allowedToolNameSet = new Set(this.#allowedToolNames)
 	}
 
 	get maxSteps() {
@@ -62,12 +78,7 @@ export default class AgentPolicy {
 	 * @returns {string[]}
 	 */
 	listAllowedToolNames() {
-		return [
-			...BUILTIN_AGENT_TOOL_NAMES,
-			...(this.#visionAvailable ? VISION_AGENT_TOOL_NAMES : []),
-			...(this.#exportMode ? EXPORT_AGENT_TOOL_NAMES : []),
-			...this.#dynamicRegistry.keys(),
-		]
+		return this.#allowedToolNames
 	}
 
 	/**
@@ -75,12 +86,7 @@ export default class AgentPolicy {
 	 * @returns {boolean}
 	 */
 	isAllowedAction(name) {
-		return (
-			BUILTIN_AGENT_TOOL_NAMES.includes(name) ||
-			(this.#visionAvailable && VISION_AGENT_TOOL_NAMES.includes(name)) ||
-			(this.#exportMode && EXPORT_AGENT_TOOL_NAMES.includes(name)) ||
-			this.#dynamicRegistry.has(name)
-		)
+		return this.#allowedToolNameSet.has(name)
 	}
 
 	/**
@@ -97,7 +103,11 @@ export default class AgentPolicy {
 		}
 
 		if (!this.isAllowedAction(name)) {
-			throw AgentValidationError.actionNotAllowed(name, this.listAllowedToolNames())
+			throw AgentValidationError.actionNotAllowed(
+				name,
+				this.#allowedToolNames,
+				suggestAgentToolName(name, this.#allowedToolNames),
+			)
 		}
 
 		if (name === 'navigate' && typeof params.url === 'string') {
@@ -125,6 +135,10 @@ export default class AgentPolicy {
 				context.knownSelectors,
 				context.elements ?? [],
 			)
+		}
+
+		if (INTERACTION_SELECTOR_ACTIONS.has(name) && typeof params.selector === 'string') {
+			this.validateInteractableSelector(name, params.selector, context.elements ?? [])
 		}
 	}
 
@@ -163,6 +177,19 @@ export default class AgentPolicy {
 				SELECTOR_NOT_IN_OBSERVATION,
 				suggestedElements,
 			)
+		}
+	}
+
+	/**
+	 * @param {string} toolName
+	 * @param {string} selector
+	 * @param {import('./observePage.js').PageElement[]} elements
+	 */
+	validateInteractableSelector(toolName, selector, elements) {
+		const element = elements.find((entry) => entry.selector === selector)
+
+		if (element?.interactable === false) {
+			throw AgentValidationError.notInteractable(toolName, selector)
 		}
 	}
 

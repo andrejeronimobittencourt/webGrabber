@@ -30,7 +30,7 @@ export class AgentValidationError extends Error {
 	static observationSelectorsEmpty(selector, hint) {
 		return new AgentValidationError(
 			'Selector is not in the observation yet',
-			`Selector "${selector}" is not in the observation yet. ${hint}`,
+			`Selector "${selector}" is not in elements[]. ${hint}`,
 		)
 	}
 
@@ -43,7 +43,7 @@ export class AgentValidationError extends Error {
 	static selectorNotInObservation(selector, hint, suggestedElements = []) {
 		return new AgentValidationError(
 			'Selector is not in the current observation',
-			`Selector "${selector}" is not in the current observation. ${hint}`,
+			`Selector "${selector}" is not in elements[]. ${hint}`,
 			{ suggestedElements },
 		)
 	}
@@ -54,14 +54,9 @@ export class AgentValidationError extends Error {
 	 * @returns {AgentValidationError}
 	 */
 	static missingSelector(toolName, suggestedElements = []) {
-		const suffix =
-			suggestedElements.length > 0
-				? ' Pass selector from elements; see suggestedElements.'
-				: ' Pass selector copied exactly from an elements entry.'
-
 		return new AgentValidationError(
 			`${toolName} requires a selector`,
-			`${toolName} requires selector from the current elements list.${suffix}`,
+			`${toolName}: missing selector parameter.`,
 			{ suggestedElements },
 		)
 	}
@@ -85,7 +80,19 @@ export class AgentValidationError extends Error {
 	static hostNotAllowed(hostname) {
 		return new AgentValidationError(
 			`Host "${hostname}" is not allowed`,
-			`Host "${hostname}" is not allowed by AGENT_ALLOWED_HOSTS`,
+			`Host "${hostname}" is not allowed by AGENT_ALLOWED_HOSTS.`,
+		)
+	}
+
+	/**
+	 * @param {string} toolName
+	 * @param {string} selector
+	 * @returns {AgentValidationError}
+	 */
+	static notInteractable(toolName, selector) {
+		return new AgentValidationError(
+			'Element is not interactable',
+			`${toolName}: elements[].interactable is false for "${selector}".`,
 		)
 	}
 
@@ -95,19 +102,24 @@ export class AgentValidationError extends Error {
 	static paginationExhausted() {
 		return new AgentValidationError(
 			'All elements are already listed',
-			'paginateElements cannot run because elementsPage.hasMore is false. Read the current elements or use another tool.',
+			'paginateElements rejected: elementsPage.hasMore is false.',
 		)
 	}
 
 	/**
 	 * @param {string} name
 	 * @param {string[]} allowedToolNames
+	 * @param {string | null} suggestedToolName
 	 * @returns {AgentValidationError}
 	 */
-	static actionNotAllowed(name, allowedToolNames) {
+	static actionNotAllowed(name, allowedToolNames, suggestedToolName) {
+		const suggestion = suggestedToolName
+			? ` Nearest tool name: "${suggestedToolName}".`
+			: ` Allowed tools: ${allowedToolNames.join(', ')}.`
+
 		return new AgentValidationError(
 			`Action "${name}" is not allowed in agent mode`,
-			`Action "${name}" is not allowed. Use only the provided tools: ${allowedToolNames.join(', ')}.`,
+			`Tool "${name}" is not in the tool list.${suggestion}`,
 		)
 	}
 }

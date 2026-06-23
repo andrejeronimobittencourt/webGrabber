@@ -59,122 +59,10 @@ export function buildVisionCacheKey(domCacheKey, screenshotBase64) {
 }
 
 /**
- * @param {import('puppeteer').Page} page
- * @returns {Promise<PageFingerprint>}
- */
-export async function computePageFingerprint(page) {
-	const scroll = await page.evaluate(() => ({
-		scrollX: window.scrollX,
-		scrollY: window.scrollY,
-	}))
-
-	const domSignature = await page.evaluate(() => {
-		const nonRenderedAncestorSelector = 'script, style, noscript, template, head'
-
-		const isCollectableBodyElement = (element) => {
-			const body = document.body
-
-			if (!body || !body.contains(element)) {
-				return false
-			}
-
-			return !element.closest(nonRenderedAncestorSelector)
-		}
-
-		const isInteractiveVisible = (element) => {
-			if (element instanceof HTMLInputElement && element.type === 'hidden') {
-				return false
-			}
-
-			const style = window.getComputedStyle(element)
-
-			if (style.display === 'none' || style.visibility === 'hidden') {
-				return false
-			}
-
-			if (Number.parseFloat(style.opacity) === 0) {
-				return false
-			}
-
-			const rect = element.getBoundingClientRect()
-
-			return rect.width > 0 && rect.height > 0
-		}
-
-		const body = document.body
-
-		if (!body) {
-			return '0'
-		}
-
-		const nodes = body.querySelectorAll(
-			'a, button, input, textarea, select, [role="button"]',
-		)
-		const visibleNodes = Array.from(nodes)
-			.filter(isCollectableBodyElement)
-			.filter(isInteractiveVisible)
-		let signature = String(visibleNodes.length)
-
-		for (const element of visibleNodes) {
-			const text = (element.textContent || element.value || element.getAttribute('aria-label') || '')
-				.trim()
-				.slice(0, 40)
-			signature += `|${element.tagName}:${element.id || ''}:${element.getAttribute('name') || ''}:${text}`
-		}
-
-		return signature
-	})
-
-	return {
-		url: page.url(),
-		scrollX: scroll.scrollX,
-		scrollY: scroll.scrollY,
-		domSignature,
-	}
-}
-
-/**
- * Per-run cache for agent DOM observation pages and viewport vision summaries.
+ * Per-run cache for viewport vision summaries.
  */
 export default class AgentObservationCache {
-	#dom = new Map()
 	#vision = new Map()
-
-	/**
-	 * @param {string} domCacheKey
-	 * @returns {boolean}
-	 */
-	hasDom(domCacheKey) {
-		return this.#dom.has(domCacheKey)
-	}
-
-	/**
-	 * @param {string} domCacheKey
-	 * @returns {{ elements: import('./observePage.js').PageElement[], elementsPage: import('./observePage.js').ElementsPageMeta }}
-	 */
-	getDom(domCacheKey) {
-		const entry = this.#dom.get(domCacheKey)
-
-		if (!entry) {
-			throw new Error(`DOM cache miss for key "${domCacheKey}"`)
-		}
-
-		return {
-			elements: structuredClone(entry.elements),
-			elementsPage: structuredClone(entry.elementsPage),
-		}
-	}
-
-	/**
-	 * @param {string} domCacheKey
-	 * @param {{ elements: import('./observePage.js').PageElement[], elementsPage: import('./observePage.js').ElementsPageMeta }} value
-	 */
-	setDom(domCacheKey, value) {
-		this.#dom.set(domCacheKey, {
-			elements: structuredClone(value.elements),
-			elementsPage: structuredClone(value.elementsPage),
-		})
-	}
 
 	/**
 	 * @param {string} visionCacheKey
@@ -207,7 +95,6 @@ export default class AgentObservationCache {
 	}
 
 	invalidate() {
-		this.#dom.clear()
 		this.#vision.clear()
 	}
 }

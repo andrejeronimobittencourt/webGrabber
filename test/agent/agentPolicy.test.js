@@ -26,8 +26,7 @@ test('AgentPolicy rejects blocked actions', () => {
 		policy.validateAction('puppeteer', { func: 'goto', url: 'https://example.com' })
 		assert.fail('Expected puppeteer to be rejected')
 	} catch (error) {
-		assert.match(error instanceof Error ? error.message : '', /not allowed/)
-		assert.match(error instanceof Error ? error.message : '', /Use only the provided tools:/)
+		assert.match(error instanceof Error ? error.message : '', /not in the tool list/)
 	}
 })
 
@@ -38,8 +37,8 @@ test('AgentPolicy blocked action error lists provided tools for the model', () =
 		policy.validateAction('scroll', {})
 		assert.fail('Expected scroll to be rejected')
 	} catch (error) {
-		assert.match(error instanceof Error ? error.message : '', /Action "scroll" is not allowed/)
-		assert.match(error instanceof Error ? error.message : '', /Use only the provided tools:/)
+		assert.match(error instanceof Error ? error.message : '', /Tool "scroll" is not in the tool list/)
+		assert.match(error instanceof Error ? error.message : '', /Allowed tools:/)
 		assert.match(error instanceof Error ? error.message : '', /navigate/)
 		assert.match(error instanceof Error ? error.message : '', /pressKey/)
 	}
@@ -110,7 +109,7 @@ test('AgentPolicy rejects click without selector', () => {
 				knownSelectors: new Set(['a.link']),
 				elements,
 			}),
-		/requires selector/,
+		/missing selector parameter/,
 	)
 })
 
@@ -126,7 +125,6 @@ test('AgentPolicy suggests elements when click omits selector but passes text', 
 		assert.fail('Expected missing selector error')
 	} catch (error) {
 		assert.ok(error instanceof AgentValidationError)
-		assert.match(error.message, /suggestedElements/)
 		assert.strictEqual(error.suggestedElements?.length, 1)
 	}
 })
@@ -152,7 +150,7 @@ test('AgentPolicy rejects selectors outside the observation', () => {
 			policy.validateAction('type', { selector: 'textarea[name="csi"]', text: 'test' }, {
 				knownSelectors,
 			}),
-		/not in the current observation/,
+		/elements\[\]/,
 	)
 })
 
@@ -163,6 +161,35 @@ test('AgentPolicy allows selectors from the observation without pickElement', ()
 	assert.doesNotThrow(() =>
 		policy.validateAction('type', { selector: 'textarea[name="q"]', text: 'test' }, {
 			knownSelectors,
+			elements: [{ selector: 'textarea[name="q"]', text: '', interactable: true }],
+		}),
+	)
+})
+
+test('AgentPolicy rejects interaction tools on readable-only elements', () => {
+	const policy = new AgentPolicy()
+	const knownSelectors = new Set(['h1'])
+	const elements = [{ selector: 'h1', text: 'Example Domain', interactable: false }]
+
+	assert.throws(
+		() =>
+			policy.validateAction('click', { selector: 'h1' }, {
+				knownSelectors,
+				elements,
+			}),
+		/interactable is false/,
+	)
+})
+
+test('AgentPolicy allows inspectElement on readable-only elements', () => {
+	const policy = new AgentPolicy({ visionAvailable: true })
+	const knownSelectors = new Set(['p.result'])
+	const elements = [{ selector: 'p.result', text: 'Portugal vs Uzbekistan', interactable: false }]
+
+	assert.doesNotThrow(() =>
+		policy.validateAction('inspectElement', { selector: 'p.result' }, {
+			knownSelectors,
+			elements,
 		}),
 	)
 })
@@ -176,7 +203,7 @@ test('AgentPolicy rejects getElements selectors outside the observation', () => 
 			policy.validateAction('getElements', { selector: 'div.guessed' }, {
 				knownSelectors,
 			}),
-		/not in the current observation/,
+		/elements\[\]/,
 	)
 })
 

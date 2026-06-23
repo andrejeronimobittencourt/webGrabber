@@ -39,6 +39,7 @@ import {
 } from './interactiveElementList.js'
 import {
 	buildElementsPageMeta,
+	clearPageSnapshotCache,
 	enrichObservationWithVision,
 	inspectElement,
 	isAgentPreNavigatePageUrl,
@@ -46,6 +47,7 @@ import {
 	observePage,
 	refreshKnownSelectorsFromPage,
 } from './observePage.js'
+import { resolveAgentToolName } from './agentToolNameResolver.js'
 import { safeAgentPageUrl, waitForAgentPageSettle } from './waitForAgentPageSettle.js'
 import {
 	bindAgentTabSync,
@@ -214,6 +216,7 @@ export default class AgentRunner {
 						{ force: true },
 					)
 				}
+				knownSelectors.clear()
 				registerObservationSelectors(knownSelectors, observation.elements)
 
 				const currentObservationFingerprint = buildObservationFingerprint(
@@ -258,14 +261,23 @@ export default class AgentRunner {
 				const assistantMessage = choice.message
 
 				if (hasAssistantToolCalls(assistantMessage)) {
-					const usedMutatingTool = assistantMessage.tool_calls.some((toolCall) =>
-						isMutatingAgentTool(toolCall.function.name) ||
-						dynamicToolNames.has(toolCall.function.name),
+					const allowedToolNames = policy.listAllowedToolNames()
+					const resolvedToolCalls = assistantMessage.tool_calls.map((toolCall) => {
+						const rawToolName = toolCall.function.name
+						const toolName =
+							resolveAgentToolName(rawToolName, allowedToolNames) ?? rawToolName
+
+						return {
+							rawToolName,
+							toolName,
+							params: JSON.parse(toolCall.function.arguments || '{}'),
+						}
+					})
+					const usedMutatingTool = resolvedToolCalls.some(({ toolName }) =>
+						isMutatingAgentTool(toolName) || dynamicToolNames.has(toolName),
 					)
 
-					for (const toolCall of assistantMessage.tool_calls) {
-						const toolName = toolCall.function.name
-						const params = JSON.parse(toolCall.function.arguments || '{}')
+					for (const { rawToolName, toolName, params } of resolvedToolCalls) {
 						const page = brain.browser.activePage
 
 						if (!AGENT_QUIET_TOOLS.has(toolName)) {
@@ -309,7 +321,10 @@ export default class AgentRunner {
 								result = await paginateElements(page, {
 									offset: nextState.offset,
 									limit: params.limit,
-								})
+								}, brain)
+								observation.elements = result.elements
+								observation.elementsPage = result.elementsPage
+								knownSelectors.clear()
 								registerObservationSelectors(knownSelectors, result.elements)
 							} else if (toolName === 'listTabs') {
 								result = await listAgentTabs(brain)
@@ -349,6 +364,7 @@ export default class AgentRunner {
 							error: toolError,
 							pageUrl: page.url(),
 							timestamp: new Date().toISOString(),
+							...(rawToolName !== toolName ? { requestedAction: rawToolName } : {}),
 						})
 
 						if (toolName === 'navigate' && !toolError) {
@@ -362,12 +378,7 @@ export default class AgentRunner {
 						) {
 							clearPickedSelector(brain)
 							knownSelectors.clear()
-							const pageBeforeSync = brain.browser.activePage
 							await syncAgentBrowserTabs(brain)
-
-							if (brain.browser.activePage !== pageBeforeSync) {
-								knownSelectors.clear()
-							}
 
 							await waitForAgentPageSettle(brain.browser.activePage)
 							await refreshKnownSelectorsFromPage(
@@ -382,6 +393,7 @@ export default class AgentRunner {
 
 					if (usedMutatingTool) {
 						observationCache.invalidate()
+						clearPageSnapshotCache(brain)
 						brain.run.elementList = createDefaultInteractiveElementListState()
 					}
 

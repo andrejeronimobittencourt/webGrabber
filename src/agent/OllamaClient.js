@@ -105,11 +105,9 @@ export default class OllamaClient {
 			.filter(Boolean)
 			.join(' — ')
 		const prompt =
-			'Describe this screenshot. Report visible content and interactive elements.' +
-			(context.selector
-				? ' This is a focused crop of a single target element.'
-				: ' This shows only the current viewport, not the full page.') +
-			(contextLine ? `\nPage context: ${contextLine}` : '')
+			'Describe visible content in this screenshot.' +
+			(context.selector ? ' Focused crop of one element.' : ' Current viewport only.') +
+			(contextLine ? `\nContext: ${contextLine}` : '')
 
 		const completion = await this.#request(this.#visionModel, [
 			{

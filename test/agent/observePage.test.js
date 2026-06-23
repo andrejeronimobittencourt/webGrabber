@@ -9,6 +9,29 @@ import {
 	shouldIncludePageScreenshot,
 } from '../../src/agent/observePage.js'
 
+function createSnapshotEvaluate(options = {}) {
+	const { elements = [], domSignature = '0' } = options
+
+	return async (fn) => {
+		const src = String(fn)
+
+		if (src.includes('domSignature') || src.includes('collectSelector')) {
+			return {
+				scrollX: 0,
+				scrollY: 0,
+				domSignature,
+				elements,
+			}
+		}
+
+		return { scrollX: 0, scrollY: 0, domSignature: '0', elements: [] }
+	}
+}
+
+function createBrain() {
+	return { recall: () => null, run: { pageSnapshotCache: null } }
+}
+
 test('buildElementsPageMeta calculates totalPages and hasMore', () => {
 	assert.deepStrictEqual(buildElementsPageMeta(312, 0, 100), {
 		pageIndex: 0,
@@ -45,14 +68,15 @@ test('collectInteractiveElements scopes collection to visible body content', asy
 	/** @type {((args: object) => unknown) | null} */
 	let browserCollector = null
 	const page = {
-		async evaluate(fn, args) {
+		url: () => 'https://example.com',
+		async evaluate(fn) {
 			browserCollector = fn
 
-			return { elements: [], total: 0 }
+			return { scrollX: 0, scrollY: 0, domSignature: '0', elements: [] }
 		},
 	}
 
-	await collectInteractiveElements(page)
+	await collectInteractiveElements(page, createBrain())
 
 	assert.ok(browserCollector)
 	assert.match(String(browserCollector), /document\.body/)
@@ -63,20 +87,17 @@ test('collectInteractiveElements scopes collection to visible body content', asy
 
 test('collectInteractiveElements returns paginated elements with selectors', async () => {
 	const page = {
-		async evaluate(_fn, { elementOffset, elementLimit }) {
-			const all = Array.from({ length: 5 }, (_, index) => ({
+		url: () => 'https://example.com',
+		evaluate: createSnapshotEvaluate({
+			elements: Array.from({ length: 5 }, (_, index) => ({
 				selector: `#item-${index}`,
 				text: `Item ${index}`,
-			}))
-
-			return {
-				elements: all.slice(elementOffset, elementOffset + elementLimit),
-				total: all.length,
-			}
-		},
+				interactable: true,
+			})),
+		}),
 	}
 
-	const result = await collectInteractiveElements(page, { offset: 2, limit: 2 })
+	const result = await collectInteractiveElements(page, createBrain(), { offset: 2, limit: 2 })
 
 	assert.strictEqual(result.elements.length, 2)
 	assert.strictEqual(result.elements[0].selector, '#item-2')
@@ -88,15 +109,12 @@ test('collectInteractiveElements returns paginated elements with selectors', asy
 
 test('paginateElements defaults offset to 0', async () => {
 	const page = {
-		async evaluate(_fn, { elementOffset, elementLimit }) {
-			assert.strictEqual(elementOffset, 0)
-			assert.strictEqual(elementLimit, 25)
-
-			return { elements: [], total: 0 }
-		},
+		url: () => 'https://example.com',
+		evaluate: createSnapshotEvaluate({ elements: [] }),
 	}
+	const brain = createBrain()
 
-	const result = await paginateElements(page, {})
+	const result = await paginateElements(page, {}, brain)
 
 	assert.strictEqual(result.offset, 0)
 	assert.strictEqual(result.elements.length, 0)
@@ -104,47 +122,38 @@ test('paginateElements defaults offset to 0', async () => {
 })
 
 test('paginateElements rejects a negative offset', async () => {
-	const page = { async evaluate() {} }
+	const page = {
+		url: () => 'https://example.com',
+		evaluate: createSnapshotEvaluate({ elements: [] }),
+	}
+	const brain = createBrain()
 
-	await assert.rejects(() => paginateElements(page, { offset: -1 }), /non-negative integer/)
+	await assert.rejects(() => paginateElements(page, { offset: -1 }, brain), /non-negative integer/)
 })
 
 test('observePage returns a single elements list', async () => {
-	let fingerprintStep = 0
 	const page = {
 		url: () => 'https://example.com',
 		async title() {
 			return 'Example'
 		},
-		async evaluate(_fn, args) {
-			if (typeof args?.elementOffset === 'number') {
-				return {
-					elements: [
-						{ selector: 'textarea[name="q"]', text: '' },
-						{ selector: 'h1', text: 'Example Domain' },
-					],
-					total: 2,
-				}
-			}
-
-			fingerprintStep += 1
-			if (fingerprintStep % 2 === 1) {
-				return { scrollX: 0, scrollY: 0 }
-			}
-
-			return '2|TEXTAREA:q:|H1::Example Domain'
-		},
+		evaluate: createSnapshotEvaluate({
+			domSignature: '2|TEXTAREA:q:|H1::Example Domain',
+			elements: [
+				{ selector: 'textarea[name="q"]', text: '', interactable: true },
+				{ selector: 'h1', text: 'Example Domain', interactable: false },
+			],
+		}),
 	}
 
-	const observation = await observePage(page, { recall: () => null }, {
+	const observation = await observePage(page, createBrain(), {
 		includeScreenshot: false,
 	})
 
 	assert.deepStrictEqual(observation.elements, [
-		{ selector: 'textarea[name="q"]', text: '' },
-		{ selector: 'h1', text: 'Example Domain' },
+		{ selector: 'textarea[name="q"]', text: '', interactable: true },
+		{ selector: 'h1', text: 'Example Domain', interactable: false },
 	])
-	assert.strictEqual(observation.visibleElements, undefined)
 })
 
 test('shouldIncludePageScreenshot skips vision on pre-navigate blank pages', () => {
@@ -174,31 +183,22 @@ test('observePage skips screenshot before first navigate', async () => {
 
 	try {
 		let screenshotCalls = 0
-		let fingerprintStep = 0
 		const page = {
 			url: () => 'about:blank',
 			async title() {
 				return ''
 			},
-			async evaluate(_fn, args) {
-				if (args && typeof args.elementOffset === 'number') {
-					return { elements: [], total: 0 }
-				}
-
-				fingerprintStep += 1
-				if (fingerprintStep % 2 === 1) {
-					return { scrollX: 0, scrollY: 0 }
-				}
-
-				return '0'
-			},
+			evaluate: createSnapshotEvaluate({ elements: [] }),
 			async screenshot() {
 				screenshotCalls += 1
 				return 'viewport-shot'
 			},
 		}
 
-		await observePage(page, { recall: () => null }, { hasNavigated: false, includeScreenshot: undefined })
+		await observePage(page, createBrain(), {
+			hasNavigated: false,
+			includeScreenshot: undefined,
+		})
 
 		assert.strictEqual(screenshotCalls, 0)
 	} finally {

@@ -14,7 +14,7 @@ import {
 
 const SELECTOR_PARAM = {
 	type: 'string',
-	description: 'Exact selector string copied from elements[].selector in the current observation.',
+	description: 'Selector from elements[].selector in the current observation.',
 }
 
 /** @type {AgentToolDefinition[]} */
@@ -23,7 +23,7 @@ const AGENT_TOOL_DEFINITIONS = [
 		type: 'function',
 		function: {
 			name: 'navigate',
-			description: 'Open a URL in the browser. Updates the observation on the next turn.',
+			description: 'Navigate the browser to a URL.',
 			parameters: {
 				type: 'object',
 				properties: {
@@ -44,8 +44,7 @@ const AGENT_TOOL_DEFINITIONS = [
 		type: 'function',
 		function: {
 			name: 'click',
-			description:
-				'Click an element. Requires selector from elements; element text is not a valid click target.',
+			description: 'Click the element matching selector.',
 			parameters: {
 				type: 'object',
 				properties: {
@@ -60,7 +59,7 @@ const AGENT_TOOL_DEFINITIONS = [
 		type: 'function',
 		function: {
 			name: 'type',
-			description: 'Type text into an input or textarea identified by selector from elements.',
+			description: 'Type text into the element matching selector.',
 			parameters: {
 				type: 'object',
 				properties: {
@@ -77,15 +76,13 @@ const AGENT_TOOL_DEFINITIONS = [
 		type: 'function',
 		function: {
 			name: 'paginateElements',
-			description:
-				'Change which elements slice appears in the next observation. Only when elementsPage.hasMore is true; use elementsPage.nextOffset.',
+			description: 'Set the elements slice offset for the next observation.',
 			parameters: {
 				type: 'object',
 				properties: {
 					offset: {
 						type: 'number',
-						description:
-							'Zero-based element offset for the next observation. Use elementsPage.nextOffset to advance.',
+						description: 'Zero-based element offset. elementsPage.nextOffset when advancing.',
 					},
 					limit: {
 						type: 'number',
@@ -101,8 +98,7 @@ const AGENT_TOOL_DEFINITIONS = [
 		type: 'function',
 		function: {
 			name: 'pressKey',
-			description:
-				'Press a keyboard key. Optionally focus an element first using selector from elements.',
+			description: 'Press a keyboard key. Optional selector focuses an element first.',
 			parameters: {
 				type: 'object',
 				properties: {
@@ -125,8 +121,7 @@ const AGENT_TOOL_DEFINITIONS = [
 					},
 					selector: {
 						...SELECTOR_PARAM,
-						description:
-							'Optional. Exact selector from elements to focus before pressing the key.',
+						description: 'Optional selector from elements to focus before pressing the key.',
 					},
 				},
 				required: ['key'],
@@ -150,13 +145,13 @@ const AGENT_TOOL_DEFINITIONS = [
 		type: 'function',
 		function: {
 			name: 'switchTab',
-			description: 'Switch the active browser tab using tabKey from tabs in the observation.',
+			description: 'Switch the active browser tab using tabKey from tabs.',
 			parameters: {
 				type: 'object',
 				properties: {
 					tabKey: {
 						type: 'string',
-						description: 'tabKey from observation.tabs or listTabs.',
+						description: 'tabKey from tabs or listTabs.',
 					},
 				},
 				required: ['tabKey'],
@@ -169,7 +164,7 @@ const AGENT_TOOL_DEFINITIONS = [
 		function: {
 			name: 'getElements',
 			description:
-				'Read text or a DOM attribute not already available in elements[].text. Result appears in lastResult next turn.',
+				'Read text or a DOM attribute from the element matching selector. Output appears in lastResult.',
 			parameters: {
 				type: 'object',
 				properties: {
@@ -188,8 +183,7 @@ const AGENT_TOOL_DEFINITIONS = [
 		type: 'function',
 		function: {
 			name: 'screenshot',
-			description:
-				'Save a screenshot file for the user only. Does not change your observation and you cannot see the image.',
+			description: 'Save a screenshot file for the user. Does not update the observation.',
 			parameters: {
 				type: 'object',
 				properties: {
@@ -209,8 +203,7 @@ const INSPECT_ELEMENT_TOOL_DEFINITION = {
 	type: 'function',
 	function: {
 		name: 'inspectElement',
-		description:
-			'Scroll an element into view and return its text plus a vision summary of the element.',
+		description: 'Scroll the element into view and return its text plus an optional vision summary.',
 		parameters: {
 			type: 'object',
 			properties: {
@@ -227,8 +220,7 @@ const PICK_ELEMENT_TOOL_DEFINITION = {
 	type: 'function',
 	function: {
 		name: 'pickElement',
-		description:
-			'Export only: record which elements selector your final answer came from when getElements was not used.',
+		description: 'Export mode: record the selector used for the final answer.',
 		parameters: {
 			type: 'object',
 			properties: {
@@ -241,8 +233,7 @@ const PICK_ELEMENT_TOOL_DEFINITION = {
 }
 
 const VISION_TOOL_DESCRIPTIONS = {
-	screenshot:
-		'Save a screenshot file for the user. Does not update your observation—read elements instead.',
+	screenshot: 'Save a screenshot file for the user. Does not update the observation.',
 }
 
 /**

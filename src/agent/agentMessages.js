@@ -1,4 +1,5 @@
 import { ActionError, SelectorError } from '../../packages/core/errors/ActionErrors.js'
+import { MAX_TOOL_HISTORY_STEPS } from './agentConfig.js'
 import { buildAgentSystemPrompt } from './agentEnvironment.js'
 import { AgentValidationError } from './agentErrors.js'
 import { formatObservationForModel } from './agentObservationFormat.js'
@@ -18,8 +19,8 @@ export const OBSERVATION_MESSAGE_PREFIX = 'Current page observation:\n'
 /** Prefix for the compact tool-call history user turn. */
 export const TOOL_HISTORY_MESSAGE_PREFIX = 'Tools called this run:\n'
 
-/** Prefix for feedback from the previous model step. */
-export const FEEDBACK_MESSAGE_PREFIX = 'Feedback from last step:\n'
+/** Prefix for validation and stall notes from the previous step. */
+export const FEEDBACK_MESSAGE_PREFIX = 'Last step:\n'
 
 /**
  * @param {unknown} observation
@@ -38,12 +39,16 @@ export function buildObservationMessage(observation) {
  * @returns {string}
  */
 export function buildToolHistoryMessage(steps) {
-	const history = steps.map(({ action, params }) => ({
+	const recentSteps =
+		steps.length > MAX_TOOL_HISTORY_STEPS
+			? steps.slice(-MAX_TOOL_HISTORY_STEPS)
+			: steps
+	const history = recentSteps.map(({ action, params }) => ({
 		tool: action,
 		params,
 	}))
 
-	return `${TOOL_HISTORY_MESSAGE_PREFIX}${JSON.stringify(history, null, 2)}`
+	return `${TOOL_HISTORY_MESSAGE_PREFIX}${JSON.stringify(history)}`
 }
 
 /**

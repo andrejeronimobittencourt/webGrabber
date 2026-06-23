@@ -2,14 +2,13 @@
  * @typedef {import('./observePage.js').PageElement} PageElement
  */
 
-/** Constraint when vision summaries are available in observations. */
+/** Vision capability description when vision tools and summaries are available. */
 export const VISION_AVAILABLE_CONSTRAINT =
-	'Vision is enabled: observations may include visualSummary; inspectElement may return a vision summary.'
+	'Vision enabled. Observations may include visualSummary. inspectElement is available.'
 
-/** Constraint when the model cannot see page images. */
+/** Vision capability description when vision is disabled. */
 export const VISION_UNAVAILABLE_CONSTRAINT =
-	'Vision is disabled: you cannot see screenshots or images. Read elements and use getElements when you need DOM attributes. ' +
-	'screenshot only saves a file for the user and does not update your observation.'
+	'Vision disabled. Observations contain no images. screenshot saves a file for the user and does not change the observation.'
 
 /**
  * @param {boolean} visionAvailable
@@ -19,46 +18,35 @@ export function buildVisionConstraint(visionAvailable) {
 	return visionAvailable ? VISION_AVAILABLE_CONSTRAINT : VISION_UNAVAILABLE_CONSTRAINT
 }
 
-/** Hard constraints stated once in the agent system prompt. */
-const SELECTOR_REQUIRED_TOOLS_BASE =
-	'click, type, and getElements always require selector from the current elements list. Text labels are not selectors. '
-
-const SELECTOR_REQUIRED_TOOLS_WITH_VISION =
-	'click, type, getElements, and inspectElement always require selector from the current elements list. Text labels are not selectors. '
-
-const AGENT_SYSTEM_CONSTRAINTS_TAIL =
-	'When elementsPage.hasMore is true, call paginateElements with nextOffset to load more elements. ' +
-	'Do not call paginateElements when elementsPage.hasMore is false. ' +
-	'Answer from element text when it already contains the information; use getElements only for attributes or text not shown in elements. ' +
-	'If the same tool call with identical parameters did not change the observation twice, do not repeat it; try a different tool or parameters. ' +
-	'If you call the same tool repeatedly on one page without navigating, switch to a different tool or approach.'
-
-const EXPORT_AGENT_SYSTEM_CONSTRAINTS =
-	'Export mode: call pickElement with the answer selector before a final reply when getElements was not used.'
+const EXPORT_MODE_DESCRIPTION =
+	'Export mode: pickElement is required before a final answer when getElements was not used.'
 
 /**
  * @param {boolean} exportMode
- * @param {boolean} [visionAvailable=false]
+ * @param {boolean} [_visionAvailable=false]
  * @returns {string}
  */
-export function buildAgentSystemConstraints(exportMode = false, visionAvailable = false) {
-	const selectorConstraint = visionAvailable
-		? SELECTOR_REQUIRED_TOOLS_WITH_VISION
-		: SELECTOR_REQUIRED_TOOLS_BASE
-	const constraints =
-		'You control a headless browser through tools. The user cannot see the browser. ' +
-		'Finish by replying with plain text only (no tool calls). ' +
-		'Only use tools from the provided tool list. ' +
-		'Tool history lists prior tool names and params only — not their results. Check lastResult in the observation for the most recent tool output. ' +
-		'elements is the only allowed source of selectors: each item has selector and text. Copy selector exactly; do not invent or modify selectors. ' +
-		selectorConstraint +
-		AGENT_SYSTEM_CONSTRAINTS_TAIL
+export function buildAgentSystemConstraints(exportMode = false, _visionAvailable = false) {
+	const parts = [
+		'You control a headless browser through tools. The user does not see the browser.',
+		'A run ends with a plain-text reply and no tool calls.',
+		'Tools are listed in the tools API; names are case-sensitive.',
+		'Tool history lists prior tool names and params only, not results.',
+		'lastResult in the observation holds the latest tool output.',
+		'Observations include url, title, elements, elementsPage, lastResult, tabs, and pickedSelector when set.',
+		'elements[] entries have selector, text, and interactable.',
+		'Tool selectors must match elements[].selector exactly.',
+		'click, type, and pressKey require interactable true.',
+		'getElements and inspectElement accept any selector from elements.',
+		'elementsPage has page, totalPages, totalElements, hasMore, and nextOffset.',
+		'paginateElements is rejected when elementsPage.hasMore is false.',
+	]
 
-	if (!exportMode) {
-		return constraints
+	if (exportMode) {
+		parts.push(EXPORT_MODE_DESCRIPTION)
 	}
 
-	return `${constraints} ${EXPORT_AGENT_SYSTEM_CONSTRAINTS}`
+	return parts.join(' ')
 }
 
 /**
@@ -85,13 +73,11 @@ export function buildAgentSystemPrompt(
 	)
 }
 
-/** Constraint returned to the model when a selector is not in the current observation. */
-export const SELECTOR_NOT_IN_OBSERVATION =
-	'Use a selector copied exactly from elements in the current observation.'
+/** Factual note when a selector is not in the current observation. */
+export const SELECTOR_NOT_IN_OBSERVATION = 'Selector is not in elements[].'
 
-/** Runtime constraint when pickElement is required before a final answer during export. */
-export const PICK_ELEMENT_HINT =
-	'pickElement is required before a final answer when getElements was not used.'
+/** Export-mode requirement surfaced when a final answer is blocked. */
+export const PICK_ELEMENT_HINT = EXPORT_MODE_DESCRIPTION
 
 /**
  * Register selectors from an observation element list for policy validation.

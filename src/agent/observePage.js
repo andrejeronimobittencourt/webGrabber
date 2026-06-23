@@ -3,11 +3,7 @@ import { delayMs } from '../../packages/core/utils/delayMs.js'
 import { SelectorError } from '../../packages/core/errors/ActionErrors.js'
 import { isVisionEnabled } from './agentModels.js'
 import { isObservationCacheEnabled, resolveElementOffset, resolveElementPageSize } from './agentConfig.js'
-import {
-	buildDomCacheKey,
-	buildVisionCacheKey,
-	computePageFingerprint,
-} from './AgentObservationCache.js'
+import { buildDomCacheKey, buildVisionCacheKey } from './AgentObservationCache.js'
 import { listAgentTabs } from './agentTabs.js'
 import { registerObservationSelectors } from './agentEnvironment.js'
 import {
@@ -15,15 +11,15 @@ import {
 	resolveInteractiveElementListState,
 } from './interactiveElementList.js'
 
-/** URLs where viewport vision is skipped until the agent navigates. */
-const PRE_NAVIGATE_PAGE_URLS = new Set(['about:blank', 'chrome://newtab/'])
+/** URLs treated as blank pre-navigate pages for vision and tab filtering. */
+export const AGENT_BLANK_PAGE_URLS = new Set(['about:blank', 'chrome://newtab/'])
 
 /**
  * @param {string} url
  * @returns {boolean}
  */
 export function isAgentPreNavigatePageUrl(url) {
-	return PRE_NAVIGATE_PAGE_URLS.has(url)
+	return AGENT_BLANK_PAGE_URLS.has(url)
 }
 
 /**
@@ -52,6 +48,7 @@ export function shouldIncludePageScreenshot(page, hasNavigated = false) {
  * @typedef {Object} PageElement
  * @property {string} selector
  * @property {string} text
+ * @property {boolean} interactable
  */
 
 /**
@@ -79,6 +76,17 @@ export function shouldIncludePageScreenshot(page, hasNavigated = false) {
  */
 
 /**
+ * @typedef {import('./AgentObservationCache.js').PageFingerprint} PageFingerprint
+ */
+
+/**
+ * @typedef {Object} PageSnapshotCache
+ * @property {string} key
+ * @property {PageFingerprint} fingerprint
+ * @property {PageElement[]} elements
+ */
+
+/**
  * @param {number} total
  * @param {number} offset
  * @param {number} limit
@@ -100,172 +108,267 @@ export function buildElementsPageMeta(total, offset, limit) {
 }
 
 /**
- * @param {import('puppeteer').Page} page
- * @param {{ offset?: number, limit?: number }} [options]
- * @returns {Promise<{ elements: PageElement[], elementsPage: ElementsPageMeta }>}
+ * @param {PageElement[]} allElements
+ * @param {number} offset
+ * @param {number} limit
+ * @returns {{ elements: PageElement[], elementsPage: ElementsPageMeta }}
  */
-export async function collectPageElements(page, options = {}) {
-	const offset = options.offset ?? 0
-	const limit = options.limit ?? resolveElementPageSize()
-
-	const { elements, total } = await page.evaluate(
-		({ elementOffset, elementLimit }) => {
-			const nonRenderedAncestorSelector = 'script, style, noscript, template, head'
-			const interactiveSelector =
-				'a, button, input, textarea, select, [role="button"]'
-			const readableSelector =
-				'h1, h2, h3, h4, h5, h6, p, li, label, time, td, th'
-
-			/**
-			 * @param {Element} element
-			 * @returns {string}
-			 */
-			const buildSelector = (element) => {
-				if (element.id) {
-					return `#${CSS.escape(element.id)}`
-				}
-
-				const name = element.getAttribute('name')
-				if (name) {
-					const tag = element.tagName.toLowerCase()
-					return `${tag}[name="${name.replace(/"/g, '\\"')}"]`
-				}
-
-				const parts = []
-				let current = element
-
-				while (current && current.nodeType === 1 && parts.length < 4) {
-					let part = current.tagName.toLowerCase()
-					const parent = current.parentElement
-
-					if (parent) {
-						const siblings = Array.from(parent.children).filter(
-							(child) => child.tagName === current.tagName,
-						)
-
-						if (siblings.length > 1) {
-							part += `:nth-of-type(${siblings.indexOf(current) + 1})`
-						}
-					}
-
-					parts.unshift(part)
-					current = parent
-				}
-
-				return parts.join(' > ')
-			}
-
-			const isVisible = (element) => {
-				if (element instanceof HTMLInputElement && element.type === 'hidden') {
-					return false
-				}
-
-				const style = window.getComputedStyle(element)
-
-				if (style.display === 'none' || style.visibility === 'hidden') {
-					return false
-				}
-
-				if (Number.parseFloat(style.opacity) === 0) {
-					return false
-				}
-
-				const rect = element.getBoundingClientRect()
-
-				return rect.width > 0 && rect.height > 0
-			}
-
-			/**
-			 * @param {Element} element
-			 * @returns {boolean}
-			 */
-			const isCollectableBodyElement = (element) => {
-				const body = document.body
-
-				if (!body || !body.contains(element)) {
-					return false
-				}
-
-				return !element.closest(nonRenderedAncestorSelector)
-			}
-
-			const elementText = (element) =>
-				(element.textContent || element.value || element.getAttribute('aria-label') || '')
-					.trim()
-					.slice(0, 120)
-
-			const isInteractive = (element) => element.matches(interactiveSelector)
-
-			const body = document.body
-
-			if (!body) {
-				return { elements: [], total: 0 }
-			}
-
-			const seen = new Set()
-			/** @type {Element[]} */
-			const merged = []
-
-			for (const element of body.querySelectorAll(
-				`${interactiveSelector}, ${readableSelector}`,
-			)) {
-				if (seen.has(element)) {
-					continue
-				}
-
-				seen.add(element)
-				merged.push(element)
-			}
-
-			const all = merged
-				.filter(isCollectableBodyElement)
-				.filter(isVisible)
-				.filter((element) => isInteractive(element) || elementText(element).length > 0)
-				.filter(
-					(element) =>
-						!merged.some((other) => other !== element && element.contains(other)),
-				)
-				.map((element) => ({
-					selector: buildSelector(element),
-					text: elementText(element),
-				}))
-
-			return {
-				elements: all.slice(elementOffset, elementOffset + elementLimit),
-				total: all.length,
-			}
-		},
-		{
-			elementOffset: offset,
-			elementLimit: limit,
-		},
-	)
-
+export function slicePageElements(allElements, offset, limit) {
 	return {
-		elements,
-		elementsPage: buildElementsPageMeta(total, offset, limit),
+		elements: allElements.slice(offset, offset + limit),
+		elementsPage: buildElementsPageMeta(allElements.length, offset, limit),
 	}
 }
 
 /**
+ * Collect scroll position, DOM fingerprint, and page elements in one browser round-trip.
  * @param {import('puppeteer').Page} page
+ * @returns {Promise<{ scrollX: number, scrollY: number, domSignature: string, elements: PageElement[] }>}
+ */
+export async function collectPageDomSnapshot(page) {
+	return page.evaluate(() => {
+		const nonRenderedAncestorSelector = 'script, style, noscript, template, head'
+		const interactiveSelector =
+			'a, button, input, textarea, select, [role="button"]'
+		const readableSelector =
+			'h1, h2, h3, h4, h5, h6, p, li, label, time, td, th'
+		const collectSelector = `${interactiveSelector}, ${readableSelector}`
+
+		/**
+		 * @param {Element} element
+		 * @returns {string}
+		 */
+		const buildSelector = (element) => {
+			if (element.id) {
+				return `#${CSS.escape(element.id)}`
+			}
+
+			const name = element.getAttribute('name')
+			if (name) {
+				const tag = element.tagName.toLowerCase()
+				return `${tag}[name="${name.replace(/"/g, '\\"')}"]`
+			}
+
+			const parts = []
+			let current = element
+
+			while (current && current.nodeType === 1 && parts.length < 4) {
+				let part = current.tagName.toLowerCase()
+				const parent = current.parentElement
+
+				if (parent) {
+					const siblings = Array.from(parent.children).filter(
+						(child) => child.tagName === current.tagName,
+					)
+
+					if (siblings.length > 1) {
+						part += `:nth-of-type(${siblings.indexOf(current) + 1})`
+					}
+				}
+
+				parts.unshift(part)
+				current = parent
+			}
+
+			return parts.join(' > ')
+		}
+
+		const isVisible = (element) => {
+			if (element instanceof HTMLInputElement && element.type === 'hidden') {
+				return false
+			}
+
+			const style = window.getComputedStyle(element)
+
+			if (style.display === 'none' || style.visibility === 'hidden') {
+				return false
+			}
+
+			if (Number.parseFloat(style.opacity) === 0) {
+				return false
+			}
+
+			const rect = element.getBoundingClientRect()
+
+			return rect.width > 0 && rect.height > 0
+		}
+
+		/**
+		 * @param {Element} element
+		 * @returns {boolean}
+		 */
+		const isCollectableBodyElement = (element) => {
+			const body = document.body
+
+			if (!body || !body.contains(element)) {
+				return false
+			}
+
+			return !element.closest(nonRenderedAncestorSelector)
+		}
+
+		const elementText = (element) =>
+			(element.textContent || element.value || element.getAttribute('aria-label') || '')
+				.trim()
+				.slice(0, 120)
+
+		const isInteractive = (element) => element.matches(interactiveSelector)
+
+		const body = document.body
+
+		if (!body) {
+			return {
+				scrollX: window.scrollX,
+				scrollY: window.scrollY,
+				domSignature: '0',
+				elements: [],
+			}
+		}
+
+		const seen = new Set()
+		/** @type {Element[]} */
+		const merged = []
+
+		for (const element of body.querySelectorAll(collectSelector)) {
+			if (seen.has(element)) {
+				continue
+			}
+
+			seen.add(element)
+			merged.push(element)
+		}
+
+		const candidates = merged
+			.filter(isCollectableBodyElement)
+			.filter(isVisible)
+			.filter((element) => isInteractive(element) || elementText(element).length > 0)
+
+		const candidateSet = new Set(candidates)
+		const hasListedDescendant = new Set()
+
+		for (const child of candidates) {
+			let parent = child.parentElement
+
+			while (parent && parent !== body) {
+				if (candidateSet.has(parent)) {
+					hasListedDescendant.add(parent)
+					break
+				}
+
+				parent = parent.parentElement
+			}
+		}
+
+		const leaves = candidates.filter((element) => !hasListedDescendant.has(element))
+		const elements = leaves.map((element) => ({
+			selector: buildSelector(element),
+			text: elementText(element),
+			interactable: isInteractive(element),
+		}))
+
+		let domSignature = String(leaves.length)
+
+		for (const element of leaves) {
+			const text = elementText(element).slice(0, 40)
+			domSignature += `|${element.tagName}:${element.id || ''}:${element.getAttribute('name') || ''}:${text}`
+		}
+
+		return {
+			scrollX: window.scrollX,
+			scrollY: window.scrollY,
+			domSignature,
+			elements,
+		}
+	})
+}
+
+/**
+ * @param {ReturnType<import('../../packages/core/brain/BrainFactory.js').default['create']>} brain
+ */
+export function clearPageSnapshotCache(brain) {
+	brain.run.pageSnapshotCache = null
+}
+
+/** @deprecated Use clearPageSnapshotCache */
+export function clearPageElementCache(brain) {
+	clearPageSnapshotCache(brain)
+}
+
+/**
+ * @param {import('puppeteer').Page} page
+ * @param {ReturnType<import('../../packages/core/brain/BrainFactory.js').default['create']>} brain
+ * @returns {Promise<PageSnapshotCache>}
+ */
+export async function getOrCollectPageSnapshot(page, brain) {
+	const snapshot = await collectPageDomSnapshot(page)
+	const fingerprint = {
+		url: page.url(),
+		scrollX: snapshot.scrollX,
+		scrollY: snapshot.scrollY,
+		domSignature: snapshot.domSignature,
+	}
+	const key = buildDomCacheKey(fingerprint)
+	const cached = brain.run.pageSnapshotCache
+
+	if (cached?.key === key) {
+		return cached
+	}
+
+	brain.run.pageSnapshotCache = {
+		key,
+		fingerprint,
+		elements: snapshot.elements,
+	}
+
+	return brain.run.pageSnapshotCache
+}
+
+/**
+ * @param {import('puppeteer').Page} page
+ * @param {ReturnType<import('../../packages/core/brain/BrainFactory.js').default['create']>} brain
+ * @returns {Promise<PageElement[]>}
+ */
+export async function getOrCollectAllPageElements(page, brain) {
+	const pageSnapshot = await getOrCollectPageSnapshot(page, brain)
+	return pageSnapshot.elements
+}
+
+/**
+ * @param {import('puppeteer').Page} page
+ * @param {ReturnType<import('../../packages/core/brain/BrainFactory.js').default['create']>} brain
  * @param {{ offset?: number, limit?: number }} [options]
  * @returns {Promise<{ elements: PageElement[], elementsPage: ElementsPageMeta }>}
  */
-export async function collectInteractiveElements(page, options = {}) {
-	return collectPageElements(page, options)
+export async function collectPageElements(page, brain, options = {}) {
+	const offset = options.offset ?? 0
+	const limit = options.limit ?? resolveElementPageSize()
+	const pageSnapshot = await getOrCollectPageSnapshot(page, brain)
+
+	return slicePageElements(pageSnapshot.elements, offset, limit)
+}
+
+/**
+ * @param {import('puppeteer').Page} page
+ * @param {ReturnType<import('../../packages/core/brain/BrainFactory.js').default['create']>} brain
+ * @param {{ offset?: number, limit?: number }} [options]
+ * @returns {Promise<{ elements: PageElement[], elementsPage: ElementsPageMeta }>}
+ */
+export async function collectInteractiveElements(page, brain, options = {}) {
+	return collectPageElements(page, brain, options)
 }
 
 /**
  * @param {import('puppeteer').Page} page
  * @param {{ offset?: number, limit?: number }} params
+ * @param {ReturnType<import('../../packages/core/brain/BrainFactory.js').default['create']>} brain
  * @returns {Promise<{ offset: number, elements: PageElement[], elementsPage: ElementsPageMeta }>}
  */
-export async function paginateElements(page, params = {}) {
+export async function paginateElements(page, params = {}, brain) {
 	const state = resolveInteractiveElementListState(createDefaultInteractiveElementListState(), params)
 	const limit = params.limit ?? resolveElementPageSize()
 	const offset = resolveElementOffset(state.offset)
-	const { elements, elementsPage } = await collectPageElements(page, { offset, limit })
+	const pageSnapshot = await getOrCollectPageSnapshot(page, brain)
+	const { elements, elementsPage } = slicePageElements(pageSnapshot.elements, offset, limit)
 
 	return { offset, elements, elementsPage }
 }
@@ -281,10 +384,8 @@ export async function refreshKnownSelectorsFromPage(page, brain, knownSelectors)
 
 	const limit = resolveElementPageSize()
 	const elementState = brain.run.elementList ?? createDefaultInteractiveElementListState()
-	const { elements } = await collectPageElements(page, {
-		offset: elementState.offset,
-		limit,
-	})
+	const pageSnapshot = await getOrCollectPageSnapshot(page, brain)
+	const { elements } = slicePageElements(pageSnapshot.elements, elementState.offset, limit)
 	registerObservationSelectors(knownSelectors, elements)
 }
 
@@ -307,7 +408,7 @@ export async function inspectElement(page, client, params) {
 		throw new SelectorError('inspectElement', selector)
 	}
 
-	await page.evaluate((elementSelector) => {
+	const elementMeta = await page.evaluate((elementSelector) => {
 		const element = document.querySelector(elementSelector)
 
 		if (!element) {
@@ -315,16 +416,6 @@ export async function inspectElement(page, client, params) {
 		}
 
 		element.scrollIntoView({ behavior: 'instant', block: 'center', inline: 'center' })
-	}, selector)
-
-	await delayMs(300)
-
-	const elementMeta = await page.evaluate((elementSelector) => {
-		const element = document.querySelector(elementSelector)
-
-		if (!element) {
-			throw new Error('Element not found')
-		}
 
 		return {
 			tag: element.tagName.toLowerCase(),
@@ -333,6 +424,8 @@ export async function inspectElement(page, client, params) {
 				.slice(0, 120),
 		}
 	}, selector)
+
+	await delayMs(300)
 
 	/** @type {{ selector: string, tag: string, text: string, visualSummary?: string }} */
 	const result = {
@@ -366,7 +459,6 @@ export async function inspectElement(page, client, params) {
  * @property {boolean} [hasNavigated]
  * @property {AgentObservationCache} [cache]
  * @property {boolean} [cacheEnabled]
- * @property {ReturnType<import('../../packages/core/brain/BrainFactory.js').default['create']>} [brain]
  * @property {import('./interactiveElementList.js').InteractiveElementListState} [elementList]
  */
 
@@ -381,29 +473,15 @@ export async function observePage(page, brain, options = {}) {
 	const includeScreenshot =
 		options.includeScreenshot ??
 		shouldIncludePageScreenshot(page, options.hasNavigated ?? true)
-	const cacheEnabled = options.cacheEnabled ?? isObservationCacheEnabled()
 	const pageSize = resolveElementPageSize()
-	const fingerprint = await computePageFingerprint(page)
 	const elementList = options.elementList ?? createDefaultInteractiveElementListState()
-	const domCacheKey = `${buildDomCacheKey(fingerprint)}|e:${elementList.offset}`
-
-	let elements
-	let elementsPage
-	let domCached = false
-
-	if (cacheEnabled && options.cache?.hasDom(domCacheKey)) {
-		;({ elements, elementsPage } = options.cache.getDom(domCacheKey))
-		domCached = true
-	} else {
-		;({ elements, elementsPage } = await collectPageElements(page, {
-			offset: elementList.offset,
-			limit: pageSize,
-		}))
-
-		if (cacheEnabled && options.cache) {
-			options.cache.setDom(domCacheKey, { elements, elementsPage })
-		}
-	}
+	const pageSnapshot = await getOrCollectPageSnapshot(page, brain)
+	const { elements, elementsPage } = slicePageElements(
+		pageSnapshot.elements,
+		elementList.offset,
+		pageSize,
+	)
+	const domCacheKey = `${pageSnapshot.key}|e:${elementList.offset}`
 
 	/** @type {PageObservation} */
 	const observation = {
@@ -411,7 +489,7 @@ export async function observePage(page, brain, options = {}) {
 		title: await page.title(),
 		elements,
 		elementsPage,
-		pickedSelector: options.brain?.run?.pickedSelector ?? null,
+		pickedSelector: brain.run?.pickedSelector ?? null,
 		lastResult: brain.recall(constants.inputKey),
 		tabs: await listAgentTabs(brain),
 	}
@@ -426,7 +504,7 @@ export async function observePage(page, brain, options = {}) {
 
 	observation._cacheMeta = {
 		domCacheKey,
-		domCached,
+		domCached: Boolean(brain.run.pageSnapshotCache?.key === pageSnapshot.key),
 		visionCached: false,
 	}
 
@@ -437,7 +515,6 @@ export async function observePage(page, brain, options = {}) {
  * @typedef {Object} EnrichObservationOptions
  * @property {AgentObservationCache} [cache]
  * @property {boolean} [cacheEnabled]
- * @property {ReturnType<import('../../packages/core/brain/BrainFactory.js').default['create']>} [brain]
  */
 
 /**

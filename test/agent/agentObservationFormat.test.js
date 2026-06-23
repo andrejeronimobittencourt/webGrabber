@@ -30,7 +30,7 @@ test('formatObservationForModel omits empty lastResult and blank tabs', () => {
 	const formatted = formatObservationForModel({
 		url: 'https://example.com',
 		title: 'Example',
-		elements: [{ selector: 'h1', text: 'Hello' }],
+		elements: [{ selector: 'h1', text: 'Hello', interactable: false }],
 		elementsPage: {
 			offset: 0,
 			limit: 25,
@@ -75,8 +75,8 @@ test('formatObservationTabs keeps multiple meaningful tabs', () => {
 
 test('findElementsByText matches case-insensitively', () => {
 	const elements = [
-		{ selector: 'a.one', text: 'Portugal' },
-		{ selector: 'a.two', text: 'Spain' },
+		{ selector: 'a.one', text: 'Portugal', interactable: true },
+		{ selector: 'a.two', text: 'Spain', interactable: true },
 	]
 
 	assert.deepStrictEqual(findElementsByText(elements, 'port'), [elements[0]])

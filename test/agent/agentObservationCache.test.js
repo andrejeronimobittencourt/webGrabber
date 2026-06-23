@@ -6,7 +6,6 @@ import AgentObservationCache, {
 	hashContent,
 	isMutatingAgentTool,
 } from '../../src/agent/AgentObservationCache.js'
-import { buildElementsPageMeta } from '../../src/agent/observePage.js'
 
 test('isMutatingAgentTool identifies page-changing tools', () => {
 	assert.strictEqual(isMutatingAgentTool('click'), true)
@@ -39,24 +38,17 @@ test('buildVisionCacheKey incorporates screenshot hash', () => {
 	)
 })
 
-test('AgentObservationCache stores and clears DOM and vision entries', () => {
+test('AgentObservationCache stores and clears vision entries', () => {
 	const cache = new AgentObservationCache()
-	const domKey = 'dom-key'
 	const visionKey = 'vision-key'
-	const elementsPage = buildElementsPageMeta(1, 0, 100)
 
-	cache.setDom(domKey, {
-		elements: [{ selector: '#go', text: 'Go' }],
-		elementsPage,
-	})
 	cache.setVision(visionKey, 'A search page.')
 
-	assert.strictEqual(cache.hasDom(domKey), true)
+	assert.strictEqual(cache.hasVision(visionKey), true)
 	assert.strictEqual(cache.getVision(visionKey), 'A search page.')
 
 	cache.invalidate()
 
-	assert.strictEqual(cache.hasDom(domKey), false)
 	assert.strictEqual(cache.hasVision(visionKey), false)
 })
 

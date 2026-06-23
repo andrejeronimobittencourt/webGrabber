@@ -177,7 +177,7 @@ export function findConsecutiveSameToolOnSamePage(
 export function formatRepeatedStalledActionFeedback(stalledAttempt) {
 	return (
 		`${stalledAttempt.action} with the same parameters was tried ${stalledAttempt.count} times ` +
-		'without changing the observation. Use a different tool or different parameters.'
+		'without observation change.'
 	)
 }
 
@@ -189,7 +189,7 @@ export function formatRepeatedStalledActionFeedback(stalledAttempt) {
 export function formatConsecutiveSameToolFeedback(pageLoop) {
 	return (
 		`${pageLoop.action} was called ${pageLoop.count} times in a row on the same page ` +
-		'without navigating. Use a different tool or change approach.'
+		`(${pageLoop.pageUrl}) without navigation.`
 	)
 }
 

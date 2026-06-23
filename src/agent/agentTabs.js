@@ -209,23 +209,36 @@ export async function listAgentTabs(brain) {
 	const tabs = []
 	let activeTabKey = null
 
-	for (const [tabKey, page] of Object.entries(pages)) {
-		if (!page) {
+	const tabEntries = await Promise.all(
+		Object.entries(pages).map(async ([tabKey, page]) => {
+			if (!page) {
+				return null
+			}
+
+			const active = page === activePage
+
+			return {
+				tabKey,
+				tab: {
+					tabKey,
+					url: await safeAgentPageUrl(page),
+					title: await safePageTitle(page),
+					active,
+				},
+			}
+		}),
+	)
+
+	for (const entry of tabEntries) {
+		if (!entry) {
 			continue
 		}
 
-		const active = page === activePage
-
-		if (active) {
-			activeTabKey = tabKey
+		if (entry.tab.active) {
+			activeTabKey = entry.tabKey
 		}
 
-		tabs.push({
-			tabKey,
-			url: await safeAgentPageUrl(page),
-			title: await safePageTitle(page),
-			active,
-		})
+		tabs.push(entry.tab)
 	}
 
 	return { activeTabKey, tabs }

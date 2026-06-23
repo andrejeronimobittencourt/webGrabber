@@ -1,7 +1,7 @@
+import { AGENT_BLANK_PAGE_URLS } from './observePage.js'
+
 /** @typedef {import('./observePage.js').PageObservation} PageObservation */
 /** @typedef {import('./observePage.js').PageElement} PageElement */
-
-const BLANK_TAB_URLS = new Set(['about:blank', 'chrome://newtab/'])
 
 /**
  * @param {unknown} value
@@ -29,13 +29,13 @@ export function formatObservationTabs(tabs) {
 	}
 
 	const meaningfulTabs = tabs.tabs.filter(
-		(tab) => tab.active || !BLANK_TAB_URLS.has(tab.url),
+		(tab) => tab.active || !AGENT_BLANK_PAGE_URLS.has(tab.url),
 	)
 
 	if (meaningfulTabs.length <= 1) {
 		const active = meaningfulTabs.find((tab) => tab.active) ?? meaningfulTabs[0]
 
-		if (!active || BLANK_TAB_URLS.has(active.url)) {
+		if (!active || AGENT_BLANK_PAGE_URLS.has(active.url)) {
 			return undefined
 		}
 
@@ -67,11 +67,15 @@ export function formatElementsPageForModel(elementsPage) {
  * @param {PageObservation} observation
  */
 export function formatObservationForModel(observation) {
+	const elements = [...(observation.elements ?? [])].sort(
+		(left, right) => Number(right.interactable) - Number(left.interactable),
+	)
+
 	/** @type {Record<string, unknown>} */
 	const formatted = {
 		url: observation.url,
 		title: observation.title,
-		elements: observation.elements,
+		elements,
 	}
 
 	if (observation.elementsPage) {

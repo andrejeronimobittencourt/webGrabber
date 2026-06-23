@@ -34,9 +34,54 @@ class MockOllamaClient {
 	}
 }
 
+/**
+ * @param {{ elements?: Array<{ selector: string, text: string, interactable?: boolean }>, domSignature?: string, onCollect?: () => void }} [options]
+ */
+function createMockPageEvaluate(options = {}) {
+	const {
+		elements = [
+			{ selector: 'textarea[name="q"]', text: '', interactable: true },
+			{ selector: 'h1', text: 'Example Domain', interactable: false },
+			{ selector: 'p', text: 'More information...', interactable: false },
+		],
+		domSignature = '1|A:home:Home',
+		onCollect,
+	} = options
+
+	return async (fn) => {
+		const src = String(fn)
+
+		if (src.includes('scrollIntoView')) {
+			return { tag: 'input', text: '' }
+		}
+
+		if (src.includes('domSignature') || src.includes('collectSelector')) {
+			onCollect?.()
+
+			return {
+				scrollX: 0,
+				scrollY: 0,
+				domSignature,
+				elements,
+			}
+		}
+
+		if (src.includes('window.scrollX')) {
+			return { scrollX: 0, scrollY: 0 }
+		}
+
+		if (src.includes('visibleNodes')) {
+			return domSignature
+		}
+
+		onCollect?.()
+
+		return elements
+	}
+}
+
 class MockPage {
 	#url = 'about:blank'
-	#fingerprintStep = 0
 
 	url() {
 		return this.#url
@@ -52,38 +97,7 @@ class MockPage {
 		return 'Mock Page'
 	}
 
-	async evaluate(_fn, args) {
-		if (args && typeof args.elementOffset === 'number') {
-			if (args.elementOffset === 0) {
-				return {
-					elements: [
-						{ selector: 'textarea[name="q"]', text: '' },
-						{ selector: 'h1', text: 'Example Domain' },
-						{ selector: 'p', text: 'More information...' },
-					],
-					total: 3,
-				}
-			}
-
-			const total = 150
-			const element = {
-				selector: `#item-${args.elementOffset}`,
-				text: `Item ${args.elementOffset}`,
-			}
-
-			return {
-				elements: args.elementOffset >= total ? [] : [element].slice(0, args.elementLimit),
-				total,
-			}
-		}
-
-		this.#fingerprintStep += 1
-		if (this.#fingerprintStep % 2 === 1) {
-			return { scrollX: 0, scrollY: 0 }
-		}
-
-		return '1|A:home:Home'
-	}
+	evaluate = createMockPageEvaluate()
 
 	async screenshot() {
 		return 'mock-screenshot'
@@ -118,20 +132,20 @@ class MockPage {
 function createMockEngine(options = {}) {
 	const page = new MockPage()
 
-	return {
-		async init() {},
-		listImportableCustomActions() {
-			return []
-		},
-		createBrain() {
-			return {
-				browser: { activePage: page, pages: {} },
-				presenter: { verbose: 1, indentation: 0 },
-				run: { params: {} },
-				recall: () => 'extracted-value',
-				async perform() {},
-			}
-		},
+		return {
+			async init() {},
+			listImportableCustomActions() {
+				return []
+			},
+			createBrain() {
+				return {
+					browser: { activePage: page, pages: {} },
+					presenter: { verbose: 1, indentation: 0 },
+					run: { params: {}, pageSnapshotCache: null },
+					recall: () => 'extracted-value',
+					async perform() {},
+				}
+			},
 		async bootBrowser(brain) {
 			brain.browser.activePage = page
 		},
@@ -239,22 +253,15 @@ test('AgentRunner feeds tool errors back to the model and continues', async () =
 
 test('AgentRunner feeds observation validation errors back to the model and continues', async () => {
 	const page = new MockPage()
-	page.evaluate = async (_fn, args) => {
-		if (args && typeof args.elementOffset === 'number') {
-			return {
-				elements: [{ selector: 'input[name="q"]', text: '' }],
-				total: 1,
-			}
-		}
-
-		return { scrollX: 0, scrollY: 0 }
-	}
+	page.evaluate = createMockPageEvaluate({
+		elements: [{ selector: 'input[name="q"]', text: '', interactable: true }],
+	})
 
 	const engine = createMockEngine()
 	engine.createBrain = () => ({
 		browser: { activePage: page, pages: { default: page } },
 		presenter: { verbose: 1, indentation: 0 },
-		run: { params: {}, agentMode: true },
+		run: { params: {}, agentMode: true, pageSnapshotCache: null },
 		recall: () => null,
 		async perform() {},
 	})
@@ -293,7 +300,7 @@ test('AgentRunner feeds observation validation errors back to the model and cont
 
 	assert.strictEqual(result.answer, 'Used getElements on the results tab instead.')
 	assert.strictEqual(result.steps.length, 1)
-	assert.match(result.steps[0].error ?? '', /not in the current observation/)
+	assert.match(result.steps[0].error ?? '', /not in elements\[\]/)
 	assert.match(result.steps[0].error ?? '', /div:nth-of-type\(2\)/)
 	assert.deepStrictEqual(result.steps[0].result.error, result.steps[0].error)
 	assert.ok(Array.isArray(result.steps[0].result.availableSelectors))
@@ -302,22 +309,15 @@ test('AgentRunner feeds observation validation errors back to the model and cont
 
 test('AgentRunner logs sanitized tool errors without selectors', async () => {
 	const page = new MockPage()
-	page.evaluate = async (_fn, args) => {
-		if (args && typeof args.elementOffset === 'number') {
-			return {
-				elements: [{ selector: 'input[name="q"]', text: '' }],
-				total: 1,
-			}
-		}
-
-		return { scrollX: 0, scrollY: 0 }
-	}
+	page.evaluate = createMockPageEvaluate({
+		elements: [{ selector: 'input[name="q"]', text: '', interactable: true }],
+	})
 
 	const engine = createMockEngine()
 	engine.createBrain = () => ({
 		browser: { activePage: page, pages: { default: page } },
 		presenter: { verbose: 1, indentation: 0 },
-		run: { params: {}, agentMode: true },
+		run: { params: {}, agentMode: true, pageSnapshotCache: null },
 		recall: () => null,
 		async perform() {},
 	})
@@ -510,28 +510,19 @@ test('AgentRunner executes paginateElements as an agent-native tool', async () =
 
 	try {
 		const page = new MockPage()
-		page.evaluate = async (_fn, args) => {
-			if (args && typeof args.elementOffset === 'number') {
-				const total = 150
-				const element = {
-					selector: `#item-${args.elementOffset}`,
-					text: `Item ${args.elementOffset}`,
-				}
-
-				return {
-					elements: args.elementOffset >= total ? [] : [element].slice(0, args.elementLimit),
-					total,
-				}
-			}
-
-			return { scrollX: 0, scrollY: 0 }
-		}
+		page.evaluate = createMockPageEvaluate({
+			elements: Array.from({ length: 150 }, (_, index) => ({
+				selector: `#item-${index}`,
+				text: `Item ${index}`,
+				interactable: true,
+			})),
+		})
 
 		const engine = createMockEngine()
 		engine.createBrain = () => ({
 			browser: { activePage: page, pages: { default: page } },
 			presenter: { verbose: 1, indentation: 0 },
-			run: { params: {}, agentMode: true, elementList: { offset: 0 } },
+			run: { params: {}, agentMode: true, elementList: { offset: 0 }, pageSnapshotCache: null },
 			recall: () => null,
 			async perform() {},
 		})
@@ -788,11 +779,11 @@ test('AgentRunner warns when the same stalled tool call is repeated', async () =
 	assert.strictEqual(result.steps[1].madeProgress, false)
 
 	const feedbackMessage = recordedMessages[2]?.find((message) =>
-		String(message.content).startsWith('Feedback from last step:'),
+		String(message.content).startsWith('Last step:'),
 	)
 
 	assert.match(String(feedbackMessage?.content), /same parameters was tried 2 times/)
-	assert.match(String(feedbackMessage?.content), /different tool or different parameters/)
+	assert.match(String(feedbackMessage?.content), /without observation change/)
 })
 
 test('AgentRunner warns when paginateElements loops on the same page', async () => {
@@ -813,7 +804,7 @@ test('AgentRunner warns when paginateElements loops on the same page', async () 
 	engine.createBrain = () => ({
 		browser: { activePage: page, pages: { default: page } },
 		presenter: { verbose: 1, indentation: 0 },
-		run: { params: {}, agentMode: true, elementList: { offset: 0 } },
+		run: { params: {}, agentMode: true, elementList: { offset: 0 }, pageSnapshotCache: null },
 		recall: () => null,
 		async perform() {},
 	})
@@ -856,7 +847,7 @@ test('AgentRunner warns when paginateElements loops on the same page', async () 
 	assert.strictEqual(result.steps.length, 3)
 
 	const feedbackMessage = recordedMessages[3]?.find((message) =>
-		String(message.content).startsWith('Feedback from last step:'),
+		String(message.content).startsWith('Last step:'),
 	)
 
 	assert.match(String(feedbackMessage?.content), /paginateElements was called 3 times in a row/)

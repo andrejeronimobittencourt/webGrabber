@@ -18,10 +18,10 @@ test('agent tool catalog treats click as pick-consuming', () => {
 	assert.strictEqual(AGENT_ONLY_EXPORT_ACTIONS.has('click'), false)
 })
 
-test('shouldRefreshKnownSelectorsAfterTool refreshes after navigation, not after type', () => {
+test('shouldRefreshKnownSelectorsAfterTool refreshes after navigation and type', () => {
 	assert.strictEqual(shouldRefreshKnownSelectorsAfterTool('navigate'), true)
 	assert.strictEqual(shouldRefreshKnownSelectorsAfterTool('click'), true)
 	assert.strictEqual(shouldRefreshKnownSelectorsAfterTool('pressKey'), true)
-	assert.strictEqual(shouldRefreshKnownSelectorsAfterTool('type'), false)
+	assert.strictEqual(shouldRefreshKnownSelectorsAfterTool('type'), true)
 	assert.strictEqual(shouldRefreshKnownSelectorsAfterTool('paginateElements'), false)
 })

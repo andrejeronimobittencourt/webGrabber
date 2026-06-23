@@ -16,20 +16,18 @@ test('safeAgentPageUrl returns unknown when page.url throws', async () => {
 })
 
 test('waitForAgentPageSettle retries through destroyed execution contexts', async () => {
-	let evaluateCalls = 0
+	let waitCalls = 0
 	const page = {
-		async evaluate() {
-			evaluateCalls += 1
+		async waitForFunction() {
+			waitCalls += 1
 
-			if (evaluateCalls < 3) {
+			if (waitCalls < 3) {
 				throw new Error('Execution context was destroyed, most likely because of a navigation.')
 			}
-
-			return 'complete'
 		},
 	}
 
 	await waitForAgentPageSettle(page, { timeout: 2_000 })
 
-	assert.ok(evaluateCalls >= 3)
+	assert.ok(waitCalls >= 3)
 })
