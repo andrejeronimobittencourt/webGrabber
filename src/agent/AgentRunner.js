@@ -2,10 +2,9 @@ import Engine from '../../packages/core/Engine.js'
 import constants from '../../packages/core/utils/constants.js'
 import { present } from '../../packages/core/infrastructure/presenter/present.js'
 import AgentPolicy from './AgentPolicy.js'
-import AgentObservationCache, { isMutatingAgentTool } from './AgentObservationCache.js'
+import { isMutatingAgentTool } from './AgentObservationCache.js'
 import { mapAgentToolToEngineAction } from './AgentToolMapper.js'
 import {
-	isObservationCacheEnabled,
 	resolveElementPageSize,
 	AGENT_QUIET_TOOLS,
 	shouldRefreshKnownSelectorsAfterTool,
@@ -40,7 +39,7 @@ import {
 import {
 	buildElementsPageMeta,
 	clearPageSnapshotCache,
-	enrichObservationWithVision,
+	attachPageVisionDescription,
 	inspectElement,
 	isAgentPreNavigatePageUrl,
 	paginateElements,
@@ -152,8 +151,6 @@ export default class AgentRunner {
 		let pendingFeedback = []
 
 		let answer = null
-		const observationCache = new AgentObservationCache()
-		const cacheEnabled = isObservationCacheEnabled()
 		const knownSelectors = new Set()
 		let hasNavigated = false
 		let lastAttributedStepIndex = 0
@@ -177,8 +174,6 @@ export default class AgentRunner {
 				}
 
 				const observeOptions = {
-					cache: observationCache,
-					cacheEnabled,
 					brain,
 					hasNavigated,
 					elementList: brain.run.elementList,
@@ -186,7 +181,9 @@ export default class AgentRunner {
 
 				let observation
 				try {
-					observation = await enrichObservationWithVision(
+					observation = await attachPageVisionDescription(
+						page,
+						brain,
 						await observePage(page, brain, observeOptions),
 						this.#client,
 						observeOptions,
@@ -392,7 +389,6 @@ export default class AgentRunner {
 					}
 
 					if (usedMutatingTool) {
-						observationCache.invalidate()
 						clearPageSnapshotCache(brain)
 						brain.run.elementList = createDefaultInteractiveElementListState()
 					}

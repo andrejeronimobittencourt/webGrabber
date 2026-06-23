@@ -29,7 +29,7 @@ class MockOllamaClient {
 		return { choices: [response] }
 	}
 
-	async describePageScreenshot() {
+	async describePageView() {
 		return 'Focused element summary.'
 	}
 }
@@ -467,7 +467,7 @@ test('AgentRunner skips page vision before first navigate', async () => {
 				},
 			},
 		])
-		client.describePageScreenshot = async () => {
+		client.describePageView = async () => {
 			visionCalls += 1
 			return 'Example homepage.'
 		}

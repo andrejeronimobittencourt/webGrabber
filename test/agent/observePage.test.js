@@ -6,6 +6,7 @@ import {
 	isAgentPreNavigatePageUrl,
 	paginateElements,
 	observePage,
+	shouldAttachPageVision,
 	shouldIncludePageScreenshot,
 } from '../../src/agent/observePage.js'
 
@@ -29,7 +30,7 @@ function createSnapshotEvaluate(options = {}) {
 }
 
 function createBrain() {
-	return { recall: () => null, run: { pageSnapshotCache: null } }
+	return { recall: () => null, run: { pageSnapshotCache: null, pageVisionCache: null } }
 }
 
 test('buildElementsPageMeta calculates totalPages and hasMore', () => {
@@ -156,7 +157,7 @@ test('observePage returns a single elements list', async () => {
 	])
 })
 
-test('shouldIncludePageScreenshot skips vision on pre-navigate blank pages', () => {
+test('shouldAttachPageVision skips pre-navigate blank pages', () => {
 	const previousVision = process.env.AGENT_VISION
 	process.env.AGENT_VISION = 'true'
 
@@ -165,9 +166,10 @@ test('shouldIncludePageScreenshot skips vision on pre-navigate blank pages', () 
 		const livePage = { url: () => 'https://example.com' }
 
 		assert.strictEqual(isAgentPreNavigatePageUrl('about:blank'), true)
+		assert.strictEqual(shouldAttachPageVision(blankPage, false), false)
+		assert.strictEqual(shouldAttachPageVision(blankPage, true), true)
+		assert.strictEqual(shouldAttachPageVision(livePage, false), true)
 		assert.strictEqual(shouldIncludePageScreenshot(blankPage, false), false)
-		assert.strictEqual(shouldIncludePageScreenshot(blankPage, true), true)
-		assert.strictEqual(shouldIncludePageScreenshot(livePage, false), true)
 	} finally {
 		if (previousVision === undefined) {
 			delete process.env.AGENT_VISION
@@ -177,35 +179,16 @@ test('shouldIncludePageScreenshot skips vision on pre-navigate blank pages', () 
 	}
 })
 
-test('observePage skips screenshot before first navigate', async () => {
-	const previousVision = process.env.AGENT_VISION
-	process.env.AGENT_VISION = 'true'
-
-	try {
-		let screenshotCalls = 0
-		const page = {
-			url: () => 'about:blank',
-			async title() {
-				return ''
-			},
-			evaluate: createSnapshotEvaluate({ elements: [] }),
-			async screenshot() {
-				screenshotCalls += 1
-				return 'viewport-shot'
-			},
-		}
-
-		await observePage(page, createBrain(), {
-			hasNavigated: false,
-			includeScreenshot: undefined,
-		})
-
-		assert.strictEqual(screenshotCalls, 0)
-	} finally {
-		if (previousVision === undefined) {
-			delete process.env.AGENT_VISION
-		} else {
-			process.env.AGENT_VISION = previousVision
-		}
+test('observePage does not attach visualSummary by itself', async () => {
+	const page = {
+		url: () => 'https://example.com',
+		async title() {
+			return 'Example'
+		},
+		evaluate: createSnapshotEvaluate(),
 	}
+
+	const observation = await observePage(page, createBrain())
+
+	assert.strictEqual(observation.visualSummary, undefined)
 })

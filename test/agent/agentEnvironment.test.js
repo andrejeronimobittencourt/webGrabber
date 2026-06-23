@@ -23,7 +23,8 @@ test('buildAgentSystemPrompt includes the run date and environment description',
 	assert.match(prompt, /elementsPage.hasMore is false/)
 	assert.doesNotMatch(prompt, /inspectElement is available/)
 	assert.doesNotMatch(prompt, /pickElement is required/)
-	assert.match(prompt, /Vision disabled/)
+	assert.doesNotMatch(prompt, /screenshot saves a file/)
+	assert.match(buildAgentSystemPrompt(new Date(2026, 5, 21)), /Vision disabled/)
 })
 
 test('buildAgentSystemPrompt includes export mode description when exporting', () => {
@@ -36,7 +37,7 @@ test('buildAgentSystemPrompt states vision capability when available', () => {
 	const prompt = buildAgentSystemPrompt(new Date(2026, 5, 21), { visionAvailable: true })
 
 	assert.match(prompt, /Vision enabled/)
-	assert.match(prompt, /visualSummary/)
+	assert.match(prompt, /page description/)
 	assert.match(prompt, /inspectElement is available/)
 })
 

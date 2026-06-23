@@ -183,7 +183,8 @@ const AGENT_TOOL_DEFINITIONS = [
 		type: 'function',
 		function: {
 			name: 'screenshot',
-			description: 'Save a screenshot file for the user. Does not update the observation.',
+			description:
+				'Save a screenshot file for the user. The agent cannot see the file; the observation is unchanged.',
 			parameters: {
 				type: 'object',
 				properties: {
@@ -232,10 +233,6 @@ const PICK_ELEMENT_TOOL_DEFINITION = {
 	},
 }
 
-const VISION_TOOL_DESCRIPTIONS = {
-	screenshot: 'Save a screenshot file for the user. Does not update the observation.',
-}
-
 /**
  * Build OpenAI-compatible tool definitions for Ollama agent mode.
  * @param {{ dynamicTools?: AgentToolDefinition[], visionAvailable?: boolean, exportMode?: boolean }} [options]
@@ -252,21 +249,14 @@ export function buildAgentTools({
 		...(exportMode ? [PICK_ELEMENT_TOOL_DEFINITION] : []),
 	]
 
-	return [...baseTools, ...dynamicTools].map((tool) => {
-		const description =
-			visionAvailable && tool.function.name in VISION_TOOL_DESCRIPTIONS
-				? VISION_TOOL_DESCRIPTIONS[tool.function.name]
-				: tool.function.description
-
-		return {
-			type: tool.type,
-			function: {
-				name: tool.function.name,
-				description,
-				parameters: structuredClone(tool.function.parameters),
-			},
-		}
-	})
+	return [...baseTools, ...dynamicTools].map((tool) => ({
+		type: tool.type,
+		function: {
+			name: tool.function.name,
+			description: tool.function.description,
+			parameters: structuredClone(tool.function.parameters),
+		},
+	}))
 }
 
 /**

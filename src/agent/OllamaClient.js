@@ -91,12 +91,31 @@ export default class OllamaClient {
 	}
 
 	/**
-	 * Summarize a page screenshot for the reasoning loop.
-	 * @param {string} screenshotBase64
+	 * Describe the current viewport for the reason model when vision is enabled.
+	 * @param {string} viewportBase64
+	 * @param {{ url?: string, title?: string }} [context]
+	 * @returns {Promise<string>}
+	 */
+	async describePageView(viewportBase64, context = {}) {
+		if (!this.#visionModel) {
+			return ''
+		}
+
+		const contextLine = [context.title, context.url].filter(Boolean).join(' — ')
+		const prompt =
+			'Describe the visible page content in this viewport image.' +
+			(contextLine ? `\n${contextLine}` : '')
+
+		return this.#describeViewImage(viewportBase64, prompt)
+	}
+
+	/**
+	 * Describe a single element crop for inspectElement.
+	 * @param {string} elementBase64
 	 * @param {{ url?: string, title?: string, selector?: string, elementText?: string }} [context]
 	 * @returns {Promise<string>}
 	 */
-	async describePageScreenshot(screenshotBase64, context = {}) {
+	async describeElementView(elementBase64, context = {}) {
 		if (!this.#visionModel) {
 			return ''
 		}
@@ -105,10 +124,27 @@ export default class OllamaClient {
 			.filter(Boolean)
 			.join(' — ')
 		const prompt =
-			'Describe visible content in this screenshot.' +
-			(context.selector ? ' Focused crop of one element.' : ' Current viewport only.') +
-			(contextLine ? `\nContext: ${contextLine}` : '')
+			'Describe the visible content of this element crop.' +
+			(contextLine ? `\n${contextLine}` : '')
 
+		return this.#describeViewImage(elementBase64, prompt)
+	}
+
+	/** @deprecated Use describePageView or describeElementView */
+	async describePageScreenshot(screenshotBase64, context = {}) {
+		if (context.selector) {
+			return this.describeElementView(screenshotBase64, context)
+		}
+
+		return this.describePageView(screenshotBase64, context)
+	}
+
+	/**
+	 * @param {string} imageBase64
+	 * @param {string} prompt
+	 * @returns {Promise<string>}
+	 */
+	async #describeViewImage(imageBase64, prompt) {
 		const completion = await this.#request(this.#visionModel, [
 			{
 				role: 'user',
@@ -116,7 +152,7 @@ export default class OllamaClient {
 					{ type: 'text', text: prompt },
 					{
 						type: 'image_url',
-						image_url: { url: `data:image/jpeg;base64,${screenshotBase64}` },
+						image_url: { url: `data:image/jpeg;base64,${imageBase64}` },
 					},
 				],
 			},

@@ -2,8 +2,8 @@ import constants from '../../packages/core/utils/constants.js'
 import { delayMs } from '../../packages/core/utils/delayMs.js'
 import { SelectorError } from '../../packages/core/errors/ActionErrors.js'
 import { isVisionEnabled } from './agentModels.js'
-import { isObservationCacheEnabled, resolveElementOffset, resolveElementPageSize } from './agentConfig.js'
-import { buildDomCacheKey, buildVisionCacheKey } from './AgentObservationCache.js'
+import { resolveElementOffset, resolveElementPageSize } from './agentConfig.js'
+import { buildDomCacheKey } from './AgentObservationCache.js'
 import { listAgentTabs } from './agentTabs.js'
 import { registerObservationSelectors } from './agentEnvironment.js'
 import {
@@ -23,12 +23,12 @@ export function isAgentPreNavigatePageUrl(url) {
 }
 
 /**
- * Whether the agent loop should capture a viewport screenshot for vision analysis.
+ * Whether a vision page description should be attached to the observation.
  * @param {import('puppeteer').Page} page
  * @param {boolean} [hasNavigated=false]
  * @returns {boolean}
  */
-export function shouldIncludePageScreenshot(page, hasNavigated = false) {
+export function shouldAttachPageVision(page, hasNavigated = false) {
 	if (!isVisionEnabled()) {
 		return false
 	}
@@ -40,9 +40,10 @@ export function shouldIncludePageScreenshot(page, hasNavigated = false) {
 	return !isAgentPreNavigatePageUrl(page.url())
 }
 
-/**
- * @typedef {import('./AgentObservationCache.js').default} AgentObservationCache
- */
+/** @deprecated Use shouldAttachPageVision */
+export function shouldIncludePageScreenshot(page, hasNavigated = false) {
+	return shouldAttachPageVision(page, hasNavigated)
+}
 
 /**
  * @typedef {Object} PageElement
@@ -70,7 +71,6 @@ export function shouldIncludePageScreenshot(page, hasNavigated = false) {
  * @property {ElementsPageMeta} elementsPage
  * @property {string | null} pickedSelector
  * @property {*} lastResult
- * @property {string} [screenshot]
  * @property {string} [visualSummary]
  * @property {import('./agentTabs.js').AgentTabsSnapshot} [tabs]
  */
@@ -287,6 +287,7 @@ export async function collectPageDomSnapshot(page) {
  */
 export function clearPageSnapshotCache(brain) {
 	brain.run.pageSnapshotCache = null
+	brain.run.pageVisionCache = null
 }
 
 /** @deprecated Use clearPageSnapshotCache */
@@ -435,12 +436,12 @@ export async function inspectElement(page, client, params) {
 	}
 
 	if (client.visionModel && isVisionEnabled()) {
-		const screenshot = await handle.screenshot({
+		const elementImage = await handle.screenshot({
 			encoding: 'base64',
 			type: 'jpeg',
 		})
 
-		result.visualSummary = await client.describePageScreenshot(screenshot, {
+		result.visualSummary = await client.describeElementView(elementImage, {
 			url: page.url(),
 			title: await page.title(),
 			selector,
@@ -455,10 +456,7 @@ export async function inspectElement(page, client, params) {
 
 /**
  * @typedef {Object} ObservePageOptions
- * @property {boolean} [includeScreenshot]
  * @property {boolean} [hasNavigated]
- * @property {AgentObservationCache} [cache]
- * @property {boolean} [cacheEnabled]
  * @property {import('./interactiveElementList.js').InteractiveElementListState} [elementList]
  */
 
@@ -470,9 +468,6 @@ export async function inspectElement(page, client, params) {
  * @returns {Promise<PageObservation>}
  */
 export async function observePage(page, brain, options = {}) {
-	const includeScreenshot =
-		options.includeScreenshot ??
-		shouldIncludePageScreenshot(page, options.hasNavigated ?? true)
 	const pageSize = resolveElementPageSize()
 	const elementList = options.elementList ?? createDefaultInteractiveElementListState()
 	const pageSnapshot = await getOrCollectPageSnapshot(page, brain)
@@ -481,10 +476,8 @@ export async function observePage(page, brain, options = {}) {
 		elementList.offset,
 		pageSize,
 	)
-	const domCacheKey = `${pageSnapshot.key}|e:${elementList.offset}`
 
-	/** @type {PageObservation} */
-	const observation = {
+	return {
 		url: page.url(),
 		title: await page.title(),
 		elements,
@@ -493,64 +486,49 @@ export async function observePage(page, brain, options = {}) {
 		lastResult: brain.recall(constants.inputKey),
 		tabs: await listAgentTabs(brain),
 	}
-
-	if (includeScreenshot) {
-		observation.screenshot = await page.screenshot({
-			encoding: 'base64',
-			type: 'jpeg',
-			fullPage: false,
-		})
-	}
-
-	observation._cacheMeta = {
-		domCacheKey,
-		domCached: Boolean(brain.run.pageSnapshotCache?.key === pageSnapshot.key),
-		visionCached: false,
-	}
-
-	return observation
 }
 
 /**
- * @typedef {Object} EnrichObservationOptions
- * @property {AgentObservationCache} [cache]
- * @property {boolean} [cacheEnabled]
- */
-
-/**
+ * Attach a vision-generated page description when vision is enabled.
+ * Reuses the cached description when the page fingerprint is unchanged.
+ * @param {import('puppeteer').Page} page
+ * @param {ReturnType<import('../../packages/core/brain/BrainFactory.js').default['create']>} brain
  * @param {PageObservation} observation
  * @param {import('./OllamaClient.js').default} client
- * @param {EnrichObservationOptions} [options]
+ * @param {{ hasNavigated?: boolean }} [options]
+ * @returns {Promise<PageObservation>}
  */
-export async function enrichObservationWithVision(observation, client, options = {}) {
-	const cacheEnabled = options.cacheEnabled ?? isObservationCacheEnabled()
-	const cacheMeta = observation._cacheMeta
-
-	delete observation._cacheMeta
-
-	if (!observation.screenshot || !client.visionModel) {
-		delete observation.screenshot
+export async function attachPageVisionDescription(page, brain, observation, client, options = {}) {
+	if (!client.visionModel || !shouldAttachPageVision(page, options.hasNavigated ?? true)) {
 		return observation
 	}
 
-	const visionCacheKey = cacheMeta
-		? buildVisionCacheKey(cacheMeta.domCacheKey, observation.screenshot)
-		: null
+	const snapshotKey = brain.run.pageSnapshotCache?.key
 
-	if (visionCacheKey && cacheEnabled && options.cache?.hasVision(visionCacheKey)) {
-		observation.visualSummary = options.cache.getVision(visionCacheKey)
-	} else {
-		observation.visualSummary = await client.describePageScreenshot(observation.screenshot, {
-			url: observation.url,
-			title: observation.title,
-		})
-
-		if (cacheEnabled && options.cache) {
-			options.cache.setVision(visionCacheKey, observation.visualSummary)
-		}
+	if (!snapshotKey) {
+		return observation
 	}
 
-	delete observation.screenshot
+	const cachedVision = brain.run.pageVisionCache
+
+	if (cachedVision?.key === snapshotKey) {
+		observation.visualSummary = cachedVision.description
+		return observation
+	}
+
+	const viewportImage = await page.screenshot({
+		encoding: 'base64',
+		type: 'jpeg',
+		fullPage: false,
+	})
+
+	const description = await client.describePageView(viewportImage, {
+		url: observation.url,
+		title: observation.title,
+	})
+
+	brain.run.pageVisionCache = { key: snapshotKey, description }
+	observation.visualSummary = description
 
 	return observation
 }

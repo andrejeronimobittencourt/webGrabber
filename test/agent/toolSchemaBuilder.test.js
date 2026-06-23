@@ -93,7 +93,7 @@ test('buildAgentTools omits inspectElement when vision is disabled', () => {
 	const screenshot = tools.find((tool) => tool.function.name === 'screenshot')
 
 	assert.strictEqual(tools.some((tool) => tool.function.name === 'inspectElement'), false)
-	assert.match(screenshot.function.description, /Does not update the observation/)
+	assert.match(screenshot.function.description, /agent cannot see/)
 })
 
 test('buildAgentTools includes inspectElement when vision is enabled', () => {

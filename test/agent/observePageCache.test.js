@@ -1,8 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert'
-import AgentObservationCache from '../../src/agent/AgentObservationCache.js'
 import {
-	enrichObservationWithVision,
+	attachPageVisionDescription,
 	observePage,
 } from '../../src/agent/observePage.js'
 
@@ -43,63 +42,58 @@ test('observePage reuses pageSnapshotCache for unchanged fingerprint', async () 
 				collectCalls += 1
 			},
 		}),
-		async screenshot() {
-			return 'viewport-shot'
-		},
 	}
 
-	const brain = { recall: () => null, run: { pageSnapshotCache: null } }
+	const brain = { recall: () => null, run: { pageSnapshotCache: null, pageVisionCache: null } }
 
-	const first = await observePage(page, brain, { includeScreenshot: false })
+	const first = await observePage(page, brain)
 	const cachedElements = brain.run.pageSnapshotCache?.elements
 
-	const second = await observePage(page, brain, { includeScreenshot: false })
+	const second = await observePage(page, brain)
 
 	assert.strictEqual(collectCalls, 2)
 	assert.strictEqual(brain.run.pageSnapshotCache?.elements, cachedElements)
 	assert.deepStrictEqual(first.elements, second.elements)
 })
 
-test('enrichObservationWithVision reuses cached visual summary', async () => {
-	const cache = new AgentObservationCache()
-	let visionCalls = 0
-	const client = {
-		visionModel: 'mock-vision',
-		async describePageScreenshot() {
-			visionCalls += 1
-			return 'Viewport summary.'
-		},
+test('attachPageVisionDescription reuses cached page description for unchanged fingerprint', async () => {
+	const previousVision = process.env.AGENT_VISION
+	process.env.AGENT_VISION = 'true'
+
+	try {
+		let visionCalls = 0
+		const page = {
+			url: () => 'https://example.com',
+			async title() {
+				return 'Example'
+			},
+			evaluate: createSnapshotEvaluate(),
+			async screenshot() {
+				return 'viewport-image'
+			},
+		}
+		const brain = { recall: () => null, run: { pageSnapshotCache: null, pageVisionCache: null } }
+		const client = {
+			visionModel: 'mock-vision',
+			async describePageView() {
+				visionCalls += 1
+				return 'Example search page.'
+			},
+		}
+
+		const observation = await observePage(page, brain)
+
+		await attachPageVisionDescription(page, brain, observation, client, { hasNavigated: true })
+		await attachPageVisionDescription(page, brain, observation, client, { hasNavigated: true })
+
+		assert.strictEqual(visionCalls, 1)
+		assert.strictEqual(observation.visualSummary, 'Example search page.')
+		assert.strictEqual(brain.run.pageVisionCache?.description, 'Example search page.')
+	} finally {
+		if (previousVision === undefined) {
+			delete process.env.AGENT_VISION
+		} else {
+			process.env.AGENT_VISION = previousVision
+		}
 	}
-
-	await enrichObservationWithVision(
-		{
-			url: 'https://example.com',
-			title: 'Example',
-			screenshot: 'viewport-shot',
-			_cacheMeta: {
-				domCacheKey: 'dom-key',
-				domCached: false,
-				visionCached: false,
-			},
-		},
-		client,
-		{ cache, cacheEnabled: true },
-	)
-
-	await enrichObservationWithVision(
-		{
-			url: 'https://example.com',
-			title: 'Example',
-			screenshot: 'viewport-shot',
-			_cacheMeta: {
-				domCacheKey: 'dom-key',
-				domCached: true,
-				visionCached: false,
-			},
-		},
-		client,
-		{ cache, cacheEnabled: true },
-	)
-
-	assert.strictEqual(visionCalls, 1)
 })

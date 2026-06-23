@@ -4,11 +4,11 @@
 
 /** Vision capability description when vision tools and summaries are available. */
 export const VISION_AVAILABLE_CONSTRAINT =
-	'Vision enabled. Observations may include visualSummary. inspectElement is available.'
+	'Vision enabled. Observations may include visualSummary (page description). inspectElement is available.'
 
 /** Vision capability description when vision is disabled. */
 export const VISION_UNAVAILABLE_CONSTRAINT =
-	'Vision disabled. Observations contain no images. screenshot saves a file for the user and does not change the observation.'
+	'Vision disabled. Observations have no visualSummary.'
 
 /**
  * @param {boolean} visionAvailable
