@@ -1,14 +1,18 @@
 {
   "name": "@andrejeronimobittencourt/webgrabber",
-  "version": "5.3.0",
+  "version": "5.3.1",
   "description": "Config based web scraper & browser automation",
   "main": "app.js",
   "type": "module",
+  "imports": {
+    "#core": "./packages/core/index.js",
+    "#core/*": "./packages/core/*"
+  },
   "scripts": {
     "test": "node test/runTests.js",
-    "test:unit": "node test/runTests.js test/*.test.js",
-    "test:integration": "node test/runTests.js test/integration/**/*.test.js",
-    "test:watch": "node test/runTests.js --watch test/**/*.test.js",
+    "test:unit": "node test/runTests.js 'test/*.test.js'",
+    "test:integration": "node test/runTests.js 'test/integration/**/*.test.js'",
+    "test:watch": "node test/runTests.js --watch 'test/**/*.test.js'",
     "start": "node --import dotenv/config app.js",
     "help": "node --import dotenv/config app.js --help",
     "start:server": "node --import dotenv/config app.js --server",
@@ -47,7 +51,9 @@
   },
   "devDependencies": {
     "@types/express": "^5.0.6",
+    "@types/js-yaml": "^4.0.9",
     "@types/lodash": "^4.17.24",
+    "@types/uuid": "^10.0.0",
     "eslint": "^9.39.3",
     "eslint-config-prettier": "^10.1.8",
     "eslint-plugin-prettier": "^5.5.5",

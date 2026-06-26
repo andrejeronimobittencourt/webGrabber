@@ -30,7 +30,9 @@ test('buildAgentSystemPrompt includes the run date and environment description',
 test('buildAgentSystemPrompt includes export mode description when exporting', () => {
 	const prompt = buildAgentSystemPrompt(new Date(2026, 5, 21), { exportMode: true })
 
-	assert.match(prompt, /Export mode: pickElement is required/)
+	assert.match(prompt, /Export mode/)
+	assert.match(prompt, /"answer".*"selector"/)
+	assert.match(prompt, /selector field is required in export mode/)
 })
 
 test('buildAgentSystemPrompt states vision capability when available', () => {

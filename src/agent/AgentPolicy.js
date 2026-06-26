@@ -126,10 +126,7 @@ export default class AgentPolicy {
 			this.validateRequiredSelector(name, params, context.elements ?? [])
 		}
 
-		if (
-			(name === 'pickElement' || SELECTOR_ACTIONS.has(name)) &&
-			typeof params.selector === 'string'
-		) {
+		if (SELECTOR_ACTIONS.has(name) && typeof params.selector === 'string') {
 			this.validateObservationSelector(
 				params.selector,
 				context.knownSelectors,

@@ -97,7 +97,7 @@ test('exportGrabFromSteps omits agent-only exploration steps', () => {
 	})
 })
 
-test('exportGrabFromSteps omits pagination and pick steps from export', () => {
+test('exportGrabFromSteps omits agent-only steps including paginateElements and inspectElement', () => {
 	const grab = exportGrabFromSteps([
 		{
 			action: 'navigate',
@@ -106,10 +106,6 @@ test('exportGrabFromSteps omits pagination and pick steps from export', () => {
 		{
 			action: 'paginateElements',
 			params: { offset: 0 },
-		},
-		{
-			action: 'pickElement',
-			params: { selector: 'h1' },
 		},
 		{
 			action: 'getElements',
@@ -124,17 +120,16 @@ test('exportGrabFromSteps omits pagination and pick steps from export', () => {
 	})
 })
 
-test('exportGrabFromSteps synthesizes getElements from pickElement when the model answered without reading', () => {
-	const grab = exportGrabFromSteps([
-		{
-			action: 'navigate',
-			params: { url: 'https://example.com' },
-		},
-		{
-			action: 'pickElement',
-			params: { selector: 'html > body > div > h1' },
-		},
-	])
+test('exportGrabFromSteps synthesizes getElements from answerSelector when not already present', () => {
+	const grab = exportGrabFromSteps(
+		[
+			{
+				action: 'navigate',
+				params: { url: 'https://example.com' },
+			},
+		],
+		{ answerSelector: 'html > body > div > h1' },
+	)
 
 	assert.strictEqual(grab.actions.length, 2)
 	assert.deepStrictEqual(grab.actions[1], {
@@ -143,50 +138,38 @@ test('exportGrabFromSteps synthesizes getElements from pickElement when the mode
 	})
 })
 
-test('exportGrabFromSteps does not synthesize getElements when pick was used for click', () => {
-	const grab = exportGrabFromSteps([
-		{
-			action: 'navigate',
-			params: { url: 'https://example.com' },
-		},
-		{
-			action: 'pickElement',
-			params: { selector: 'button.submit' },
-		},
-		{
-			action: 'click',
-			params: { selector: 'button.submit' },
-		},
-	])
+test('exportGrabFromSteps does not duplicate getElements when selector already read', () => {
+	const grab = exportGrabFromSteps(
+		[
+			{
+				action: 'navigate',
+				params: { url: 'https://example.com' },
+			},
+			{
+				action: 'getElements',
+				params: { selector: 'h1' },
+			},
+		],
+		{ answerSelector: 'h1' },
+	)
 
+	// No duplicate — the existing getElements covers it.
 	assert.strictEqual(grab.actions.length, 2)
 	assert.deepStrictEqual(grab.actions[1], {
-		name: 'click',
-		params: { selector: 'button.submit' },
-	})
-})
-
-test('exportGrabFromSteps appends synthesized getElements after intervening exported actions', () => {
-	const grab = exportGrabFromSteps([
-		{
-			action: 'navigate',
-			params: { url: 'https://example.com' },
-		},
-		{
-			action: 'click',
-			params: { selector: 'button.more' },
-		},
-		{
-			action: 'pickElement',
-			params: { selector: 'h1' },
-		},
-	])
-
-	assert.strictEqual(grab.actions.length, 3)
-	assert.deepStrictEqual(grab.actions[2], {
 		name: 'getElements',
 		params: { selector: 'h1' },
 	})
+})
+
+test('exportGrabFromSteps does not synthesize getElements when no answerSelector is provided', () => {
+	const grab = exportGrabFromSteps([
+		{
+			action: 'navigate',
+			params: { url: 'https://example.com' },
+		},
+	])
+
+	assert.strictEqual(grab.actions.length, 1)
 })
 
 test('exportGrabFromSteps maps dynamic grab tools to runGrab', () => {

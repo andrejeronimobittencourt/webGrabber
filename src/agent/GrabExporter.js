@@ -1,7 +1,4 @@
-import {
-	AGENT_ONLY_EXPORT_ACTIONS,
-	PICK_CONSUMING_ACTIONS,
-} from './agentConfig.js'
+import { AGENT_ONLY_EXPORT_ACTIONS } from './agentConfig.js'
 import { mapAgentToolToEngineAction } from './AgentToolMapper.js'
 import { grabSchema, formatGrabValidationError } from '../../packages/core/schemas/grabSchema.js'
 import { FileSystem } from '../../packages/core/utils/FileSystem.js'
@@ -9,90 +6,6 @@ import { pathJoin, rootPathJoin } from '../../packages/core/utils/paths.js'
 
 /** @typedef {import('./AgentToolMapper.js').AgentStep} AgentStep */
 /** @typedef {import('./agentDynamicTools.js').DynamicToolRegistryEntry} DynamicToolRegistryEntry */
-
-/**
- * @param {AgentStep[]} steps
- * @param {number} pickIndex
- * @param {string} selector
- * @returns {boolean}
- */
-function pickWasUsedForInteraction(steps, pickIndex, selector) {
-	return steps.slice(pickIndex + 1).some(
-		(step) =>
-			!step.error &&
-			PICK_CONSUMING_ACTIONS.has(step.action) &&
-			step.params?.selector === selector,
-	)
-}
-
-/**
- * @param {AgentStep[]} steps
- * @param {number} pickIndex
- * @param {string} selector
- * @returns {boolean}
- */
-function hasSuccessfulGetElementsAfterPick(steps, pickIndex, selector) {
-	return steps.slice(pickIndex + 1).some(
-		(step) =>
-			!step.error &&
-			step.action === 'getElements' &&
-			step.params?.selector === selector,
-	)
-}
-
-/**
- * @param {Array<{ name: string, params: object }>} actions
- * @param {string} selector
- */
-function insertReadActionFromPick(actions, selector) {
-	if (
-		actions.some(
-			(action) => action.name === 'getElements' && action.params?.selector === selector,
-		)
-	) {
-		return
-	}
-
-	actions.push({
-		name: 'getElements',
-		params: { selector },
-	})
-}
-
-/**
- * @param {AgentStep[]} steps
- * @param {Array<{ name: string, params: object }>} actions
- * @returns {Array<{ name: string, params: object }>}
- */
-function synthesizeReadActionsFromPicks(steps, actions) {
-	const synthesizedActions = [...actions]
-
-	for (let stepIndex = 0; stepIndex < steps.length; stepIndex += 1) {
-		const step = steps[stepIndex]
-
-		if (step.error || step.action !== 'pickElement') {
-			continue
-		}
-
-		const selector = step.params?.selector
-
-		if (typeof selector !== 'string' || !selector) {
-			continue
-		}
-
-		if (pickWasUsedForInteraction(steps, stepIndex, selector)) {
-			continue
-		}
-
-		if (hasSuccessfulGetElementsAfterPick(steps, stepIndex, selector)) {
-			continue
-		}
-
-		insertReadActionFromPick(synthesizedActions, selector)
-	}
-
-	return synthesizedActions
-}
 
 /**
  * @param {AgentStep} step
@@ -128,15 +41,35 @@ function mapStepToGrabAction(step, dynamicRegistry) {
 }
 
 /**
+ * Append a `getElements` action for the given selector if one does not already
+ * exist in the action list for that selector.
+ * @param {Array<{ name: string, params: object }>} actions
+ * @param {string} selector
+ */
+function appendGetElementsIfAbsent(actions, selector) {
+	const alreadyPresent = actions.some(
+		(action) => action.name === 'getElements' && action.params?.selector === selector,
+	)
+	if (!alreadyPresent) {
+		actions.push({ name: 'getElements', params: { selector } })
+	}
+}
+
+/**
  * Convert an agent audit log into a replayable grab config.
- * Synthesizes getElements from pickElement when the model answered without a DOM read step.
+ *
+ * When an `answerSelector` is provided (from the export-mode answer JSON), a
+ * `getElements` action is synthesized at the end of the grab — unless the run
+ * already explicitly called `getElements` with that selector.
+ *
  * @param {AgentStep[]} steps
- * @param {{ name?: string, description?: string, dynamicRegistry?: Map<string, DynamicToolRegistryEntry> }} [options]
+ * @param {{ name?: string, description?: string, dynamicRegistry?: Map<string, DynamicToolRegistryEntry>, answerSelector?: string | null }} [options]
  * @returns {{ name: string, description: string, actions: Array<{ name: string, params: object }> }}
  */
 export function exportGrabFromSteps(steps, options = {}) {
 	const name = options.name ?? 'agent-export'
 	const description = options.description ?? 'Exported from an agent run'
+	const answerSelector = options.answerSelector ?? null
 
 	/** @type {Array<{ name: string, params: object }>} */
 	const actions = []
@@ -149,11 +82,11 @@ export function exportGrabFromSteps(steps, options = {}) {
 		actions.push(mapStepToGrabAction(step, options.dynamicRegistry))
 	}
 
-	return {
-		name,
-		description,
-		actions: synthesizeReadActionsFromPicks(steps, actions),
+	if (answerSelector) {
+		appendGetElementsIfAbsent(actions, answerSelector)
 	}
+
+	return { name, description, actions }
 }
 
 /**
@@ -206,7 +139,7 @@ export async function writeExportedGrabToFile(grabConfig, { overwrite = false } 
 
 /**
  * Build and write a grab exported from a completed agent run.
- * @param {{ steps: AgentStep[], instruction: string, exportGrabName: string, exportOverwrite?: boolean, dynamicRegistry?: Map<string, DynamicToolRegistryEntry> }} options
+ * @param {{ steps: AgentStep[], instruction: string, exportGrabName: string, exportOverwrite?: boolean, dynamicRegistry?: Map<string, DynamicToolRegistryEntry>, answerSelector?: string | null }} options
  * @returns {Promise<string>} Absolute path to the written grab file
  */
 export async function exportAgentRunGrab(options) {
@@ -216,11 +149,14 @@ export async function exportAgentRunGrab(options) {
 		exportGrabName,
 		exportOverwrite = false,
 		dynamicRegistry,
+		answerSelector = null,
 	} = options
+
 	const grabConfig = exportGrabFromSteps(steps, {
 		name: exportGrabName,
 		description: instruction,
 		dynamicRegistry,
+		answerSelector,
 	})
 
 	if (grabConfig.actions.length === 0) {

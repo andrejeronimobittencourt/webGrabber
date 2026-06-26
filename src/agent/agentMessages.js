@@ -1,5 +1,5 @@
 import { ActionError, SelectorError } from '../../packages/core/errors/ActionErrors.js'
-import { MAX_TOOL_HISTORY_STEPS } from './agentConfig.js'
+import { MAX_TOOL_HISTORY_STEPS, SKIP_RESULT_TOOLS } from './agentConfig.js'
 import { buildAgentSystemPrompt } from './agentEnvironment.js'
 import { AgentValidationError } from './agentErrors.js'
 import { formatObservationForModel } from './agentObservationFormat.js'
@@ -23,6 +23,13 @@ export const TOOL_HISTORY_MESSAGE_PREFIX = 'Tools called this run:\n'
 export const FEEDBACK_MESSAGE_PREFIX = 'Last step:\n'
 
 /**
+ * Nudge used when the model answers in export mode without providing a selector.
+ * The model is reminded to respond with the full JSON answer object.
+ */
+export const EXPORT_ANSWER_SELECTOR_NUDGE =
+	'Export mode: your answer must be JSON {"answer":"...","selector":"css-selector-from-elements"}. The selector is required.'
+
+/**
  * @param {unknown} observation
  * @returns {string}
  */
@@ -35,6 +42,28 @@ export function buildObservationMessage(observation) {
 }
 
 /**
+ * Build a compact tool-history entry. Contains only the tool name, params
+ * (with `reason` extracted to its own key), and nothing else — results and
+ * errors are intentionally excluded; the model learns from the next observation
+ * instead, keeping the context lean and focused.
+ * @param {AgentStep} step
+ * @returns {{ tool: string, params: Record<string, unknown>, reason?: string }}
+ */
+function buildToolHistoryEntry(step) {
+	const { reason, ...actionParams } = step.params ?? {}
+	const entry = { tool: step.action, params: actionParams }
+
+	if (step.reason) {
+		entry.reason = step.reason
+	} else if (typeof reason === 'string' && reason) {
+		// Backwards-compat: reason may have been stored inside params on older steps.
+		entry.reason = reason
+	}
+
+	return entry
+}
+
+/**
  * @param {AgentStep[]} steps
  * @returns {string}
  */
@@ -43,10 +72,8 @@ export function buildToolHistoryMessage(steps) {
 		steps.length > MAX_TOOL_HISTORY_STEPS
 			? steps.slice(-MAX_TOOL_HISTORY_STEPS)
 			: steps
-	const history = recentSteps.map(({ action, params }) => ({
-		tool: action,
-		params,
-	}))
+
+	const history = recentSteps.map(buildToolHistoryEntry)
 
 	return `${TOOL_HISTORY_MESSAGE_PREFIX}${JSON.stringify(history)}`
 }
@@ -177,11 +204,15 @@ export function hasAssistantToolCalls(message) {
 }
 
 /**
- * Extract final answer text from an assistant message.
+ * @typedef {{ text: string, selector: string | null }} AssistantAnswer
+ */
+
+/**
+ * Extract the raw string content from an assistant message regardless of format.
  * @param {OllamaChatMessage} message
  * @returns {string}
  */
-export function resolveAssistantAnswerText(message) {
+function extractRawContent(message) {
 	if (typeof message.content === 'string') {
 		return message.content.trim()
 	}
@@ -195,6 +226,47 @@ export function resolveAssistantAnswerText(message) {
 	}
 
 	return ''
+}
+
+/**
+ * Parse the final assistant answer. In export mode the model is instructed to reply
+ * with JSON `{"answer":"…","selector":"…"}`. If the content is valid JSON with an
+ * `answer` key the selector is extracted; otherwise the raw content is used as the
+ * answer text and selector is null (graceful degradation).
+ *
+ * In non-export mode the raw content is returned as-is with a null selector.
+ *
+ * @param {OllamaChatMessage} message
+ * @param {boolean} [exportMode=false]
+ * @returns {AssistantAnswer}
+ */
+export function resolveAssistantAnswer(message, exportMode = false) {
+	const raw = extractRawContent(message)
+
+	if (exportMode) {
+		try {
+			const parsed = JSON.parse(raw)
+			if (parsed && typeof parsed.answer === 'string') {
+				return {
+					text: parsed.answer.trim(),
+					selector: typeof parsed.selector === 'string' ? parsed.selector : null,
+				}
+			}
+		} catch {
+			// Not JSON — fall through to raw text.
+		}
+	}
+
+	return { text: raw, selector: null }
+}
+
+/**
+ * Thin wrapper for backward compatibility with call sites that only need the text.
+ * @param {OllamaChatMessage} message
+ * @returns {string}
+ */
+export function resolveAssistantAnswerText(message) {
+	return resolveAssistantAnswer(message).text
 }
 
 /**

@@ -18,6 +18,16 @@ export function buildPuppeteerLaunchOptions(options) {
 	return launchOptions
 }
 
+/**
+ * Module-level flag tracking whether puppeteer-extra plugins have been registered.
+ *
+ * ⚠️  Constraint: puppeteer-extra registers plugins on a shared global instance and
+ * provides no unregister API. Therefore only one `Engine` / `PuppeteerPageFactory`
+ * lifecycle is supported per Node.js process. A second `init()` call will reuse the
+ * same browser rather than re-registering plugins.
+ */
+let pluginsRegistered = false
+
 class Puppeteer {
 	#options
 	#browser
@@ -28,8 +38,11 @@ class Puppeteer {
 	}
 
 	async launch() {
-		if (this.#options.stealth === true) puppeteer.use(StealthPlugin())
-		if (this.#options.adblocker === true) puppeteer.use(AdblockerPlugin({ blockTrackers: true }))
+		if (!pluginsRegistered) {
+			if (this.#options.stealth === true) puppeteer.use(StealthPlugin())
+			if (this.#options.adblocker === true) puppeteer.use(AdblockerPlugin({ blockTrackers: true }))
+			pluginsRegistered = true
+		}
 		this.#browser = await puppeteer.launch(buildPuppeteerLaunchOptions(this.#options))
 	}
 

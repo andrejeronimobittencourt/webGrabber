@@ -101,10 +101,19 @@ export default class OllamaClient {
 			return ''
 		}
 
+		const contextParts = []
+		if (context.instruction) {
+			contextParts.push(`Overall Goal: ${context.instruction}`)
+		}
+		if (context.lastIntent) {
+			contextParts.push(`Agent's Latest Intent: ${context.lastIntent}`)
+		}
+
 		const contextLine = [context.title, context.url].filter(Boolean).join(' — ')
 		const prompt =
-			'Describe the visible page content in this viewport image.' +
-			(contextLine ? `\n${contextLine}` : '')
+			'Describe the visible page content in this viewport image. Focus on identifying and describing elements that are relevant to the overall goal or the agent\'s intent.' +
+			(contextParts.length > 0 ? `\n\n${contextParts.join('\n')}` : '') +
+			(contextLine ? `\n\nPage context: ${contextLine}` : '')
 
 		return this.#describeViewImage(viewportBase64, prompt)
 	}
@@ -120,12 +129,21 @@ export default class OllamaClient {
 			return ''
 		}
 
+		const contextParts = []
+		if (context.instruction) {
+			contextParts.push(`Overall Goal: ${context.instruction}`)
+		}
+		if (context.lastIntent) {
+			contextParts.push(`Agent's Latest Intent: ${context.lastIntent}`)
+		}
+
 		const contextLine = [context.title, context.url, context.selector, context.elementText]
 			.filter(Boolean)
 			.join(' — ')
 		const prompt =
-			'Describe the visible content of this element crop.' +
-			(contextLine ? `\n${contextLine}` : '')
+			'Describe the visible content of this element crop. Focus on identifying and describing elements that are relevant to the overall goal or the agent\'s intent.' +
+			(contextParts.length > 0 ? `\n\n${contextParts.join('\n')}` : '') +
+			(contextLine ? `\n\nElement context: ${contextLine}` : '')
 
 		return this.#describeViewImage(elementBase64, prompt)
 	}

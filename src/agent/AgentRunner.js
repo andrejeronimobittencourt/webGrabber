@@ -17,11 +17,7 @@ import {
 	observationFingerprintsEqual,
 } from './agentProgress.js'
 import {
-	clearPickedSelector,
-	mustPickBeforeAnswer,
-	PICK_ELEMENT_HINT,
 	registerObservationSelectors,
-	setPickedSelector,
 } from './agentEnvironment.js'
 import OllamaClient from './OllamaClient.js'
 import { buildAgentTools } from './ToolSchemaBuilder.js'
@@ -59,17 +55,19 @@ import {
 	buildAgentModelMessages,
 	buildAgentToolResultForModel,
 	EMPTY_ASSISTANT_NUDGE,
+	EXPORT_ANSWER_SELECTOR_NUDGE,
 	formatAgentToolErrorForUser,
 	formatAgentToolFeedbackForModel,
 	hasAssistantToolCalls,
 	isEmptyAssistantTurn,
-	resolveAssistantAnswerText,
+	resolveAssistantAnswer,
 } from './agentMessages.js'
 
 /**
  * @typedef {import('./AgentToolMapper.js').AgentStep} AgentStep
  * @typedef {Object} AgentRunResult
  * @property {string} answer
+ * @property {string | null} answerSelector
  * @property {AgentStep[]} steps
  * @property {{ input: * }} memory
  */
@@ -143,7 +141,6 @@ export default class AgentRunner {
 		brain.run.grabCatalog = grabCatalog
 		brain.run.grabCallStack = []
 		brain.run.elementList = createDefaultInteractiveElementListState()
-		brain.run.pickedSelector = null
 		/** @type {AgentRunResult['steps']} */
 		const steps = []
 		const tools = buildAgentTools({ dynamicTools, visionAvailable, exportMode })
@@ -151,6 +148,8 @@ export default class AgentRunner {
 		let pendingFeedback = []
 
 		let answer = null
+		/** @type {string | null} */
+		let answerSelector = null
 		const knownSelectors = new Set()
 		let hasNavigated = false
 		let lastAttributedStepIndex = 0
@@ -177,6 +176,8 @@ export default class AgentRunner {
 					brain,
 					hasNavigated,
 					elementList: brain.run.elementList,
+					instruction,
+					lastIntent: steps.at(-1)?.reason,
 				}
 
 				let observation
@@ -196,8 +197,6 @@ export default class AgentRunner {
 						title: '',
 						elements: [],
 						elementsPage: buildElementsPageMeta(0, 0, resolveElementPageSize()),
-						pickedSelector: brain.run.pickedSelector,
-						lastResult: brain.recall(constants.inputKey),
 						tabs: { activeTabKey: null, tabs: [] },
 						observationError,
 					}
@@ -274,8 +273,12 @@ export default class AgentRunner {
 						isMutatingAgentTool(toolName) || dynamicToolNames.has(toolName),
 					)
 
-					for (const { rawToolName, toolName, params } of resolvedToolCalls) {
+					for (const { rawToolName, toolName, params: rawParams } of resolvedToolCalls) {
 						const page = brain.browser.activePage
+
+						// Extract reason before dispatch — it is a meta-field for history,
+						// not a parameter the action handlers should receive.
+						const { reason: stepReason, ...params } = rawParams
 
 						if (!AGENT_QUIET_TOOLS.has(toolName)) {
 							present(
@@ -305,16 +308,12 @@ export default class AgentRunner {
 									page,
 									grabCatalog,
 								})
-							} else if (toolName === 'pickElement') {
-								setPickedSelector(brain, params.selector)
-								result = { selector: params.selector, picked: true }
 							} else if (toolName === 'paginateElements') {
 								const nextState = resolveInteractiveElementListState(
 									brain.run.elementList,
 									params,
 								)
 								brain.run.elementList = nextState
-								clearPickedSelector(brain)
 								result = await paginateElements(page, {
 									offset: nextState.offset,
 									limit: params.limit,
@@ -357,6 +356,7 @@ export default class AgentRunner {
 						steps.push({
 							action: toolName,
 							params,
+							reason: typeof stepReason === 'string' ? stepReason : undefined,
 							result,
 							error: toolError,
 							pageUrl: page.url(),
@@ -373,7 +373,6 @@ export default class AgentRunner {
 								dynamicToolNames.has(toolName)) &&
 							!toolError
 						) {
-							clearPickedSelector(brain)
 							knownSelectors.clear()
 							await syncAgentBrowserTabs(brain)
 
@@ -408,14 +407,19 @@ export default class AgentRunner {
 					continue
 				}
 
-				const answerText = resolveAssistantAnswerText(assistantMessage)
+				const { text: answerText, selector: resolvedSelector } = resolveAssistantAnswer(
+					assistantMessage,
+					exportMode,
+				)
 
-				if (mustPickBeforeAnswer(steps, brain.run.pickedSelector, exportMode)) {
-					pendingFeedback.push(PICK_ELEMENT_HINT)
+				if (exportMode && !resolvedSelector) {
+					// Nudge the model to re-answer with the required selector field.
+					pendingFeedback.push(EXPORT_ANSWER_SELECTOR_NUDGE)
 					continue
 				}
 
 				answer = answerText
+				answerSelector = resolvedSelector
 				break
 			}
 
@@ -435,6 +439,7 @@ export default class AgentRunner {
 			/** @type {AgentRunResult & { exportedGrabPath?: string }} */
 			const runResult = {
 				answer,
+				answerSelector,
 				steps,
 				memory: {
 					input: brain.recall(constants.inputKey),
@@ -448,6 +453,7 @@ export default class AgentRunner {
 					exportGrabName,
 					exportOverwrite,
 					dynamicRegistry,
+					answerSelector,
 				})
 
 				present(

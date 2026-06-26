@@ -29,7 +29,6 @@ export default class Grabber {
 	 */
 	async init(puppeteerOptions = {}) {
 		await this.#engine.init(puppeteerOptions)
-		present([{ text: 'Grabber initialized', color: 'green', style: 'bold' }])
 	}
 
 	async loadGrabList(grabList, grabName = null) {
@@ -63,17 +62,19 @@ export default class Grabber {
 			}
 		} finally {
 			await this.#engine.cleanup(brain)
+			// Always close the browser in CLI mode to prevent leaks on any error path.
+			if (!payload) {
+				await this.#engine.close()
+			}
 		}
 
 		present([{ text: 'Grabber finished', color: 'green', style: 'bold' }])
 
-		if (!payload) {
-			present([{ text: 'Grabber closed', color: 'green', style: 'bold' }])
-			await this.#engine.close()
-			return
+		if (payload) {
+			return this.#buildResult(brain)
 		}
 
-		return this.#buildResult(brain)
+		present([{ text: 'Grabber closed', color: 'green', style: 'bold' }])
 	}
 
 	async #resolveGrabList(payload, grabName, brain) {

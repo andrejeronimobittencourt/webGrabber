@@ -5,6 +5,7 @@ export const DEFAULT_AGENT_NAVIGATE_WAIT_UNTIL = 'domcontentloaded'
  * @typedef {Object} AgentStep
  * @property {string} action
  * @property {Record<string, unknown>} params
+ * @property {string} [reason]
  * @property {*} [result]
  * @property {string | null} [error]
  * @property {boolean} [madeProgress]

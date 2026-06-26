@@ -17,18 +17,20 @@ export default class BrowserActions {
 			], brain)
 
 			try {
-				if (func === 'newPage') {
+			if (func === 'newPage') {
 					const pageKey = uuidv4()
 					brain.run.params = { pageKey }
 					await brain.perform('newPage')
-					brain.learn(constants.inputKey, pageKey)
+					brain.learn(constants.inputKey, '(no result; next observation shows page state)')
 					return
 				}
 				const params = Object.values(rest)
-				brain.learn(
-					constants.inputKey,
-					func2 ? await page[func][func2](...params) : await page[func](...params),
-				)
+				let rawResult = func2 ? await page[func][func2](...params) : await page[func](...params)
+				const mutatingFuncs = new Set(['clearCookies', 'deleteCookie', 'click', 'type', 'pressKey'])
+				if (mutatingFuncs.has(func2 || func)) {
+					rawResult = '(no result; next observation shows page state)'
+				}
+				brain.learn(constants.inputKey, rawResult)
 			} catch (error) {
 				const label = `Puppeteer ${func}${func2 ? `.${func2}` : ''}`
 				throw new Error(`${label} failed: ${error.message}`)
@@ -74,13 +76,14 @@ export default class BrowserActions {
 			}
 			const pages = brain.browser.pages
 			const page = pages[pageKey]
-			if (page) {
-				await page.bringToFront()
-				brain.browser.activePage = page
-				present([
-					{ text: `Switched to page with key '${pageKey}'`, color: 'blue', style: 'bold' },
-				], brain)
+			if (!page) {
+				throw new Error(`Page with key '${pageKey}' does not exist. Available keys: ${Object.keys(pages).join(', ') || 'none'}.`)
 			}
+			await page.bringToFront()
+			brain.browser.activePage = page
+			present([
+				{ text: `Switched to page with key '${pageKey}'`, color: 'blue', style: 'bold' },
+			], brain)
 		})
 		actionList.add('screenshot', async (brain, page) => {
 			const { name, type, fullPage } = brain.run.params
@@ -94,7 +97,7 @@ export default class BrowserActions {
 			await page.screenshot({
 				path: filePath,
 				type: validatedType,
-				fullPage: fullPage ? fullPage : true,
+				fullPage: fullPage ?? true,
 			})
 		}, { serverBlocked: true })
 		actionList.add('screenshotElement', async (brain, page) => {

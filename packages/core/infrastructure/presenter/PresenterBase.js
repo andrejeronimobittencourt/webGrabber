@@ -46,7 +46,7 @@ export default class PresenterBase {
 	 * @param {ReturnType<import('../../brain/BrainFactory.js').default['create']>} brain
 	 */
 	decrementIndentation(brain) {
-		brain.presenter.indentation -= constants.indentStep
+		brain.presenter.indentation = Math.max(0, brain.presenter.indentation - constants.indentStep)
 	}
 
 	/**

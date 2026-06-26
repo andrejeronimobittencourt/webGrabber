@@ -1,18 +1,21 @@
 {
-	"compilerOptions": {
-		"module": "ESNext",
-		"moduleResolution": "bundler",
-		"target": "ES2020",
-		"jsx": "react",
-		"strictNullChecks": true,
-		"strictFunctionTypes": true,
-		"paths": {
-			"@webgrabber/core": ["./packages/core/index.js"],
-			"@webgrabber/core/*": ["./packages/core/*"]
-		}
-	},
-	"exclude": [
-		"node_modules",
-		"**/node_modules/*"
-	]
+  "compilerOptions": {
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "target": "ES2022",
+    "paths": {
+      "#core": [
+        "./packages/core/index.js"
+      ],
+      "#core/*": [
+        "./packages/core/*"
+      ]
+    }
+  },
+  "include": [
+    "app.js",
+    "packages/**/*",
+    "grabs/**/*",
+    "test/**/*"
+  ]
 }

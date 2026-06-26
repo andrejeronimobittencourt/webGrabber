@@ -70,7 +70,6 @@ export function shouldIncludePageScreenshot(page, hasNavigated = false) {
  * @property {PageElement[]} elements
  * @property {ElementsPageMeta} elementsPage
  * @property {string | null} pickedSelector
- * @property {*} lastResult
  * @property {string} [visualSummary]
  * @property {import('./agentTabs.js').AgentTabsSnapshot} [tabs]
  */
@@ -483,7 +482,6 @@ export async function observePage(page, brain, options = {}) {
 		elements,
 		elementsPage,
 		pickedSelector: brain.run?.pickedSelector ?? null,
-		lastResult: brain.recall(constants.inputKey),
 		tabs: await listAgentTabs(brain),
 	}
 }
@@ -525,6 +523,8 @@ export async function attachPageVisionDescription(page, brain, observation, clie
 	const description = await client.describePageView(viewportImage, {
 		url: observation.url,
 		title: observation.title,
+		instruction: options.instruction,
+		lastIntent: options.lastIntent,
 	})
 
 	brain.run.pageVisionCache = { key: snapshotKey, description }

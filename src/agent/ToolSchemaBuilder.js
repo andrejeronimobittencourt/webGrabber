@@ -12,9 +12,40 @@ import {
  * @property {{ name: string, description: string, parameters: object }} function
  */
 
+/**
+ * Shared selector parameter descriptor — reused across tool definitions.
+ * @type {{ type: string, description: string }}
+ */
 const SELECTOR_PARAM = {
 	type: 'string',
 	description: 'Selector from elements[].selector in the current observation.',
+}
+
+/**
+ * Every tool call must include a reason explaining the intent.
+ * Required in the schema so the model always provides deliberate justification.
+ * @type {{ type: string, description: string }}
+ */
+const REASON_PARAM = {
+	type: 'string',
+	description: 'Why this action is being taken. Concisely explain the intent.',
+}
+
+/**
+ * Inject the reason parameter as a required field into a tool's parameter schema.
+ * Returns a new schema object — does not mutate the original.
+ * @param {object} parameters
+ * @returns {object}
+ */
+function withReason(parameters) {
+	return {
+		...parameters,
+		properties: {
+			...parameters.properties,
+			reason: REASON_PARAM,
+		},
+		required: [...(parameters.required ?? []), 'reason'],
+	}
 }
 
 /** @type {AgentToolDefinition[]} */
@@ -24,7 +55,7 @@ const AGENT_TOOL_DEFINITIONS = [
 		function: {
 			name: 'navigate',
 			description: 'Navigate the browser to a URL.',
-			parameters: {
+			parameters: withReason({
 				type: 'object',
 				properties: {
 					url: { type: 'string', description: 'Full URL to open.' },
@@ -37,7 +68,7 @@ const AGENT_TOOL_DEFINITIONS = [
 				},
 				required: ['url'],
 				additionalProperties: false,
-			},
+			}),
 		},
 	},
 	{
@@ -45,14 +76,14 @@ const AGENT_TOOL_DEFINITIONS = [
 		function: {
 			name: 'click',
 			description: 'Click the element matching selector.',
-			parameters: {
+			parameters: withReason({
 				type: 'object',
 				properties: {
 					selector: SELECTOR_PARAM,
 				},
 				required: ['selector'],
 				additionalProperties: false,
-			},
+			}),
 		},
 	},
 	{
@@ -60,7 +91,7 @@ const AGENT_TOOL_DEFINITIONS = [
 		function: {
 			name: 'type',
 			description: 'Type text into the element matching selector.',
-			parameters: {
+			parameters: withReason({
 				type: 'object',
 				properties: {
 					selector: SELECTOR_PARAM,
@@ -69,7 +100,7 @@ const AGENT_TOOL_DEFINITIONS = [
 				},
 				required: ['selector', 'text'],
 				additionalProperties: false,
-			},
+			}),
 		},
 	},
 	{
@@ -77,7 +108,7 @@ const AGENT_TOOL_DEFINITIONS = [
 		function: {
 			name: 'paginateElements',
 			description: 'Set the elements slice offset for the next observation.',
-			parameters: {
+			parameters: withReason({
 				type: 'object',
 				properties: {
 					offset: {
@@ -91,7 +122,7 @@ const AGENT_TOOL_DEFINITIONS = [
 				},
 				required: [],
 				additionalProperties: false,
-			},
+			}),
 		},
 	},
 	{
@@ -99,25 +130,12 @@ const AGENT_TOOL_DEFINITIONS = [
 		function: {
 			name: 'pressKey',
 			description: 'Press a keyboard key. Optional selector focuses an element first.',
-			parameters: {
+			parameters: withReason({
 				type: 'object',
 				properties: {
 					key: {
 						type: 'string',
-						enum: [
-							'Enter',
-							'Tab',
-							'Escape',
-							'Backspace',
-							'ArrowUp',
-							'ArrowDown',
-							'ArrowLeft',
-							'ArrowRight',
-							'Home',
-							'End',
-							'PageUp',
-							'PageDown',
-						],
+						description: 'Key name (see Puppeteer keyboard.press). Use standard names like Enter, Tab, Escape, ArrowUp, ArrowDown, Home, End, PageUp, PageDown. For combos use format Control+A or Ctrl+Shift+V.',
 					},
 					selector: {
 						...SELECTOR_PARAM,
@@ -126,7 +144,7 @@ const AGENT_TOOL_DEFINITIONS = [
 				},
 				required: ['key'],
 				additionalProperties: false,
-			},
+			}),
 		},
 	},
 	{
@@ -134,11 +152,11 @@ const AGENT_TOOL_DEFINITIONS = [
 		function: {
 			name: 'listTabs',
 			description: 'List open browser tabs and their tabKey values.',
-			parameters: {
+			parameters: withReason({
 				type: 'object',
 				properties: {},
 				additionalProperties: false,
-			},
+			}),
 		},
 	},
 	{
@@ -146,7 +164,7 @@ const AGENT_TOOL_DEFINITIONS = [
 		function: {
 			name: 'switchTab',
 			description: 'Switch the active browser tab using tabKey from tabs.',
-			parameters: {
+			parameters: withReason({
 				type: 'object',
 				properties: {
 					tabKey: {
@@ -156,16 +174,15 @@ const AGENT_TOOL_DEFINITIONS = [
 				},
 				required: ['tabKey'],
 				additionalProperties: false,
-			},
+			}),
 		},
 	},
 	{
 		type: 'function',
 		function: {
 			name: 'getElements',
-			description:
-				'Read text or a DOM attribute from the element matching selector. Output appears in lastResult.',
-			parameters: {
+			description: 'Read text or a DOM attribute from the element matching selector.',
+			parameters: withReason({
 				type: 'object',
 				properties: {
 					selector: SELECTOR_PARAM,
@@ -176,16 +193,36 @@ const AGENT_TOOL_DEFINITIONS = [
 				},
 				required: ['selector'],
 				additionalProperties: false,
-			},
+			}),
 		},
 	},
-	{
+]
+
+/**
+ * Build the screenshot tool description based on whether vision is available.
+ * When vision is disabled the agent cannot view the screenshot itself.
+ * When vision is enabled the screenshot is for the user's reference.
+ * @param {boolean} visionAvailable
+ * @returns {string}
+ */
+function buildScreenshotDescription(visionAvailable) {
+	return visionAvailable
+		? 'Save a full-viewport or cropped page screenshot for the user; the agent can inspect it via inspectElement.'
+		: 'Save a full-viewport or cropped page screenshot. The agent cannot see this screenshot directly.'
+}
+
+/**
+ * Build the screenshot tool definition.
+ * @param {boolean} visionAvailable
+ * @returns {AgentToolDefinition}
+ */
+function buildScreenshotToolDefinition(visionAvailable) {
+	return {
 		type: 'function',
 		function: {
 			name: 'screenshot',
-			description:
-				'Save a screenshot file for the user. The agent cannot see the file; the observation is unchanged.',
-			parameters: {
+			description: buildScreenshotDescription(visionAvailable),
+			parameters: withReason({
 				type: 'object',
 				properties: {
 					name: { type: 'string' },
@@ -194,10 +231,10 @@ const AGENT_TOOL_DEFINITIONS = [
 				},
 				required: ['name'],
 				additionalProperties: false,
-			},
+			}),
 		},
-	},
-]
+	}
+}
 
 /** @type {AgentToolDefinition} */
 const INSPECT_ELEMENT_TOOL_DEFINITION = {
@@ -205,31 +242,14 @@ const INSPECT_ELEMENT_TOOL_DEFINITION = {
 	function: {
 		name: 'inspectElement',
 		description: 'Scroll the element into view and return its text plus an optional vision summary.',
-		parameters: {
+		parameters: withReason({
 			type: 'object',
 			properties: {
 				selector: SELECTOR_PARAM,
 			},
 			required: ['selector'],
 			additionalProperties: false,
-		},
-	},
-}
-
-/** @type {AgentToolDefinition} */
-const PICK_ELEMENT_TOOL_DEFINITION = {
-	type: 'function',
-	function: {
-		name: 'pickElement',
-		description: 'Export mode: record the selector used for the final answer.',
-		parameters: {
-			type: 'object',
-			properties: {
-				selector: SELECTOR_PARAM,
-			},
-			required: ['selector'],
-			additionalProperties: false,
-		},
+		}),
 	},
 }
 
@@ -241,12 +261,12 @@ const PICK_ELEMENT_TOOL_DEFINITION = {
 export function buildAgentTools({
 	dynamicTools = [],
 	visionAvailable = false,
-	exportMode = false,
+	exportMode: _exportMode = false,
 } = {}) {
 	const baseTools = [
 		...AGENT_TOOL_DEFINITIONS,
+		buildScreenshotToolDefinition(visionAvailable),
 		...(visionAvailable ? [INSPECT_ELEMENT_TOOL_DEFINITION] : []),
-		...(exportMode ? [PICK_ELEMENT_TOOL_DEFINITION] : []),
 	]
 
 	return [...baseTools, ...dynamicTools].map((tool) => ({

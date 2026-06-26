@@ -203,13 +203,13 @@ test('formatGrabValidationError uses grab name in issue labels', () => {
 	const error = new z.ZodError([
 		{
 			code: 'custom',
-			message: 'Unknown action: "downloadYoutubeMp3"',
+			message: 'Unknown action: "clickButton"',
 			path: ['actions', 0, 'name'],
 		},
 	])
 
-	const formatted = formatGrabValidationError(error, 'mp3')
-	assert.match(formatted, /mp3 \(action 0\): Unknown action: "downloadYoutubeMp3"/)
+	const formatted = formatGrabValidationError(error, 'button-grab')
+	assert.match(formatted, /button-grab \(action 0\): Unknown action: "clickButton"/)
 })
 
 test('grabSchema validates unknown actions nested in control flow', () => {

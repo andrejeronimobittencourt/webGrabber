@@ -39,7 +39,6 @@ export function buildObservationFingerprint(observation) {
 				total: observation.elementsPage.total,
 			}
 			: null,
-		lastResult: observation.lastResult ?? null,
 		pickedSelector: observation.pickedSelector ?? null,
 	})
 }
@@ -177,7 +176,7 @@ export function findConsecutiveSameToolOnSamePage(
 export function formatRepeatedStalledActionFeedback(stalledAttempt) {
 	return (
 		`${stalledAttempt.action} with the same parameters was tried ${stalledAttempt.count} times ` +
-		'without observation change.'
+		'without observation change. Try a different selector or parameter.'
 	)
 }
 
@@ -189,7 +188,7 @@ export function formatRepeatedStalledActionFeedback(stalledAttempt) {
 export function formatConsecutiveSameToolFeedback(pageLoop) {
 	return (
 		`${pageLoop.action} was called ${pageLoop.count} times in a row on the same page ` +
-		`(${pageLoop.pageUrl}) without navigation.`
+		`(${pageLoop.pageUrl}) without navigation. Navigate away or try a different action.`
 	)
 }
 

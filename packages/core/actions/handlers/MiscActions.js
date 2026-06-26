@@ -22,7 +22,7 @@ export default class MiscActions {
 					brain.learn(constants.inputKey, input)
 					rl.close()
 				} catch (e) {
-					throw new Error(e)
+					throw e
 				}
 			})()
 		}, { serverBlocked: true })

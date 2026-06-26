@@ -3,8 +3,10 @@ import assert from 'node:assert'
 import AgentRunner from '../../src/agent/AgentRunner.js'
 import AgentPolicy from '../../src/agent/AgentPolicy.js'
 import GrabCatalog from '../../packages/core/grabCatalog.js'
+import fs from 'node:fs'
 import CliPresenter from '../../src/infrastructure/presenter/CliPresenter.js'
 import { setPresenter } from '../../src/infrastructure/presenter/present.js'
+import { resolveExportedGrabFilePath } from '../../src/agent/GrabExporter.js'
 
 class MockOllamaClient {
 	#responses
@@ -572,7 +574,7 @@ test('AgentRunner executes paginateElements as an agent-native tool', async () =
 	}
 })
 
-test('AgentRunner requires pickElement before answering during export', async () => {
+test('AgentRunner accepts JSON answer with selector in export mode', async () => {
 	const engine = createMockEngine()
 	engine.perform = async (brain, name) => {
 		if (name === 'puppeteer' || name === 'navigate') {
@@ -593,51 +595,95 @@ test('AgentRunner requires pickElement before answering during export', async ()
 							type: 'function',
 							function: {
 								name: 'navigate',
-								arguments: JSON.stringify({ url: 'https://example.com' }),
+								arguments: JSON.stringify({ url: 'https://example.com', reason: 'Go to target' }),
 							},
 						},
 					],
 				},
 			},
 			{
+				// Model answers with selector embedded in JSON as required by export mode.
 				message: {
 					role: 'assistant',
-					content: 'Example Domain',
-				},
-			},
-			{
-				message: {
-					role: 'assistant',
-					tool_calls: [
-						{
-							id: 'call-2',
-							type: 'function',
-							function: {
-								name: 'pickElement',
-								arguments: JSON.stringify({ selector: 'h1' }),
-							},
-						},
-					],
-				},
-			},
-			{
-				message: {
-					role: 'assistant',
-					content: 'Example Domain',
+					content: JSON.stringify({ answer: 'Example Domain', selector: 'h1' }),
 				},
 			},
 		]),
 	}))
 
-	const result = await runner.run('Return the page heading', {
-		exportGrabName: 'heading-export',
-		exportOverwrite: true,
-	})
+	let result
+	try {
+		result = await runner.run('Return the page heading', {
+			exportGrabName: 'heading-export',
+			exportOverwrite: true,
+		})
 
-	assert.strictEqual(result.answer, 'Example Domain')
-	assert.strictEqual(result.steps[0].action, 'navigate')
-	assert.strictEqual(result.steps[1].action, 'pickElement')
+		assert.strictEqual(result.answer, 'Example Domain')
+		assert.strictEqual(result.answerSelector, 'h1')
+		assert.strictEqual(result.steps[0].action, 'navigate')
+		assert.strictEqual(result.steps[0].reason, 'Go to target')
+	} finally {
+		try { fs.unlinkSync(resolveExportedGrabFilePath('heading-export')) } catch {}
+	}
 })
+
+test('AgentRunner nudges model when export answer is missing selector', async () => {
+	const engine = createMockEngine()
+	engine.perform = async (brain, name) => {
+		if (name === 'puppeteer' || name === 'navigate') {
+			brain.browser.activePage.setUrl('https://example.com')
+		}
+	}
+
+	/** @type {import('../../src/agent/OllamaClient.js').OllamaChatMessage[][]} */
+	const recordedMessages = []
+
+	class RecordingOllamaClient extends MockOllamaClient {
+		async chat(messages) {
+			recordedMessages.push(messages)
+			return super.chat(messages)
+		}
+	}
+
+	const runner = new AgentRunner(createRunnerOptions({
+		engine,
+		policy: new AgentPolicy({ maxSteps: 8, exportMode: true }),
+		client: new RecordingOllamaClient([
+			{
+				message: {
+					role: 'assistant',
+					content: 'Example Domain', // Missing selector — will be nudged.
+				},
+			},
+			{
+				// Second attempt: correct JSON answer.
+				message: {
+					role: 'assistant',
+					content: JSON.stringify({ answer: 'Example Domain', selector: 'h1' }),
+				},
+			},
+		]),
+	}))
+
+	let result
+	try {
+		result = await runner.run('Return the page heading', {
+			exportGrabName: 'nudge-test',
+			exportOverwrite: true,
+		})
+
+		assert.strictEqual(result.answer, 'Example Domain')
+		assert.strictEqual(result.answerSelector, 'h1')
+
+		// Second turn should contain the export selector nudge.
+		const nudgeTurn = recordedMessages[1]
+		const feedbackMsg = nudgeTurn?.find((m) => String(m.content).startsWith('Last step:'))
+		assert.match(String(feedbackMsg?.content), /selector is required/i)
+	} finally {
+		try { fs.unlinkSync(resolveExportedGrabFilePath('nudge-test')) } catch {}
+	}
+})
+
 
 test('AgentRunner allows type without pickElement after navigate', async () => {
 	const engine = createMockEngine()

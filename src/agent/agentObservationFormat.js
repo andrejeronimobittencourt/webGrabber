@@ -3,21 +3,6 @@ import { AGENT_BLANK_PAGE_URLS } from './observePage.js'
 /** @typedef {import('./observePage.js').PageObservation} PageObservation */
 /** @typedef {import('./observePage.js').PageElement} PageElement */
 
-/**
- * @param {unknown} value
- * @returns {boolean}
- */
-function hasMeaningfulLastResult(value) {
-	if (value === null || value === undefined) {
-		return false
-	}
-
-	if (typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 0) {
-		return false
-	}
-
-	return true
-}
 
 /**
  * @param {import('./agentTabs.js').AgentTabsSnapshot | undefined} tabs
@@ -84,10 +69,6 @@ export function formatObservationForModel(observation) {
 
 	if (observation.visualSummary) {
 		formatted.visualSummary = observation.visualSummary
-	}
-
-	if (hasMeaningfulLastResult(observation.lastResult)) {
-		formatted.lastResult = observation.lastResult
 	}
 
 	const tabs = formatObservationTabs(observation.tabs)

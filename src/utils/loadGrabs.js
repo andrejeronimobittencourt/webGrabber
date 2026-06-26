@@ -90,7 +90,7 @@ export const loadGrabs = async (options = {}) => {
 		doc = result.data
 
 		if (grabList.some((g) => g.name === doc.name)) {
-			if (warnOnInvalid && !warnForGrabName) {
+			if (warnOnInvalid) {
 				console.warn(
 					StyledConsole.create([
 						{

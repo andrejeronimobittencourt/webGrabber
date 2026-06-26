@@ -19,7 +19,7 @@ export function buildVisionConstraint(visionAvailable) {
 }
 
 const EXPORT_MODE_DESCRIPTION =
-	'Export mode: pickElement is required before a final answer when getElements was not used.'
+	'Export mode: when you have the answer, respond with JSON {"answer":"your answer text","selector":"the CSS selector from elements[] that contains the answer data"}. The selector field is required in export mode.'
 
 /**
  * @param {boolean} exportMode
@@ -29,13 +29,14 @@ const EXPORT_MODE_DESCRIPTION =
 export function buildAgentSystemConstraints(exportMode = false, _visionAvailable = false) {
 	const parts = [
 		'You control a headless browser through tools. The user does not see the browser.',
-		'A run ends with a plain-text reply and no tool calls.',
+		'A run ends with a plain-text reply (or export-mode JSON answer) and no tool calls.',
+		'If the answer is clearly visible in elements[] or visualSummary, DO NOT call any more tools. Answer immediately.',
 		'Tools are listed in the tools API; names are case-sensitive.',
-		'Tool history lists prior tool names and params only, not results.',
-		'lastResult in the observation holds the latest tool output.',
-		'Observations include url, title, elements, elementsPage, lastResult, tabs, and pickedSelector when set.',
+		'Every tool call must include a reason field explaining why the action is taken.',
+		'Tool history lists prior tool names, params, and reasons — not results.',
 		'elements[] entries have selector, text, and interactable.',
-		'Tool selectors must match elements[].selector exactly.',
+		'NEVER guess or hallucinate CSS selectors. You MUST copy them exactly from elements[].',
+		'Tool selectors must EXACTLY match elements[].selector from the current observation.',
 		'click, type, and pressKey require interactable true.',
 		'getElements and inspectElement accept any selector from elements.',
 		'elementsPage has page, totalPages, totalElements, hasMore, and nextOffset.',
@@ -46,7 +47,7 @@ export function buildAgentSystemConstraints(exportMode = false, _visionAvailable
 		parts.push(EXPORT_MODE_DESCRIPTION)
 	}
 
-	return parts.join(' ')
+	return parts.join('\n')
 }
 
 /**
@@ -76,9 +77,6 @@ export function buildAgentSystemPrompt(
 /** Factual note when a selector is not in the current observation. */
 export const SELECTOR_NOT_IN_OBSERVATION = 'Selector is not in elements[].'
 
-/** Export-mode requirement surfaced when a final answer is blocked. */
-export const PICK_ELEMENT_HINT = EXPORT_MODE_DESCRIPTION
-
 /**
  * Register selectors from an observation element list for policy validation.
  * @param {Set<string>} knownSelectors
@@ -88,50 +86,4 @@ export function registerObservationSelectors(knownSelectors, elements) {
 	for (const element of elements) {
 		knownSelectors.add(element.selector)
 	}
-}
-
-/**
- * @param {import('./AgentToolMapper.js').AgentStep[]} steps
- * @returns {boolean}
- */
-function hasSuccessfulGetElements(steps) {
-	return steps.some((step) => !step.error && step.action === 'getElements')
-}
-
-/**
- * Whether pickElement is required before a final answer during grab export.
- * @param {import('./AgentToolMapper.js').AgentStep[]} steps
- * @param {string | null | undefined} pickedSelector
- * @param {boolean} [exportMode=false]
- * @returns {boolean}
- */
-export function mustPickBeforeAnswer(steps, pickedSelector, exportMode = false) {
-	if (!exportMode) {
-		return false
-	}
-
-	if (pickedSelector) {
-		return false
-	}
-
-	if (hasSuccessfulGetElements(steps)) {
-		return false
-	}
-
-	return steps.some((step) => !step.error && step.action === 'navigate')
-}
-
-/**
- * @param {ReturnType<import('../../packages/core/brain/BrainFactory.js').default['create']>} brain
- */
-export function clearPickedSelector(brain) {
-	brain.run.pickedSelector = null
-}
-
-/**
- * @param {ReturnType<import('../../packages/core/brain/BrainFactory.js').default['create']>} brain
- * @param {string} selector
- */
-export function setPickedSelector(brain, selector) {
-	brain.run.pickedSelector = selector
 }

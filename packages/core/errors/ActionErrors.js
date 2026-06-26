@@ -8,6 +8,10 @@ export class ActionError extends Error {
 		this.actionName = actionName
 		this.context = context
 		this.timestamp = new Date().toISOString()
+
+		if (Error.captureStackTrace) {
+			Error.captureStackTrace(this, this.constructor)
+		}
 	}
 
 	toJSON() {
@@ -43,7 +47,7 @@ export class NetworkError extends ActionError {
 		super(actionName, `Network request failed: ${url}`, {
 			...context,
 			url,
-			originalError: originalError.message,
+			originalError: originalError?.message ?? String(originalError),
 		})
 		this.name = 'NetworkError'
 	}
@@ -71,7 +75,7 @@ export class FileSystemError extends ActionError {
 			...context,
 			operation,
 			path,
-			originalError: originalError.message,
+			originalError: originalError?.message ?? String(originalError),
 		})
 		this.name = 'FileSystemError'
 	}

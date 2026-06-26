@@ -6,12 +6,11 @@ export const AGENT_ONLY_EXPORT_ACTIONS = new Set([
 	'inspectElement',
 	'paginateElements',
 	'listTabs',
-	'pickElement',
 	'switchTab',
 ])
 
 /** Agent tools omitted from normal CLI progress output. */
-export const AGENT_QUIET_TOOLS = new Set(['pickElement'])
+export const AGENT_QUIET_TOOLS = new Set([])
 
 /** Agent tools that consume a pick for interaction rather than read-and-answer export. */
 export const PICK_CONSUMING_ACTIONS = new Set(['click', 'inspectElement', 'pressKey', 'type'])
@@ -38,6 +37,20 @@ export const PAGE_LOOP_MONITOR_TOOLS = new Set([
 	'inspectElement',
 	'paginateElements',
 	'pressKey',
+])
+
+/** Tool result string shown after a successful mutating tool that yields no result object. */
+const MUTATING_TOOL_SUCCESS_HINT = '(no result shown; see next observation for effect)'
+
+/** Tools whose success output should not clutter the agent prompt. */
+export const SKIP_RESULT_TOOLS = new Set([
+	'navigate',
+	'click',
+	'type',
+	'pressKey',
+	'screenshot',
+	'inspectElement',
+	'switchTab',
 ])
 
 /**

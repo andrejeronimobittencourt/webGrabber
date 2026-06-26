@@ -39,6 +39,7 @@ export default class Engine {
 		this.#customActionList.add(name, action, options)
 	}
 
+
 	/**
 	 * @returns {Array<{ name: string, description?: string, parameters?: object }>}
 	 */
@@ -65,10 +66,12 @@ export default class Engine {
 		BrainFactory.init(memories, actions)
 		await PuppeteerPageFactory.init(puppeteerOptions)
 		this.#initialized = true
+
 		if (!quiet) {
 			present([{ text: 'Engine initialized', color: 'green', style: 'bold' }])
 		}
 	}
+
 
 	/**
 	 * Create a per-run Brain instance.
@@ -81,6 +84,7 @@ export default class Engine {
 		return BrainFactory.create()
 	}
 
+
 	/**
 	 * Boot the default browser page on a brain instance.
 	 * @param {ReturnType<typeof BrainFactory.create>} brain
@@ -92,6 +96,7 @@ export default class Engine {
 		brain.browser.activePage = defaultPage
 	}
 
+
 	/**
 	 * Close all pages tracked on a brain instance.
 	 * @param {ReturnType<typeof BrainFactory.create>} brain
@@ -100,10 +105,15 @@ export default class Engine {
 		const pages = brain.browser.pages
 		if (pages) {
 			for (const key in pages) {
-				await pages[key].close()
+				try {
+					await pages[key].close()
+				} catch (e) {
+					// Fail-safe closure preventions for stale pages
+				}
 			}
 		}
 	}
+
 
 	/**
 	 * Close the shared Puppeteer browser instance.
@@ -111,10 +121,12 @@ export default class Engine {
 	 */
 	async close({ quiet = false } = {}) {
 		await PuppeteerPageFactory.close()
+		this.#initialized = false
 		if (!quiet) {
 			present([{ text: 'Engine closed', color: 'green', style: 'bold' }])
 		}
 	}
+
 
 	/**
 	 * Execute an action on a brain instance.

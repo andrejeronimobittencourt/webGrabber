@@ -113,6 +113,7 @@ export class ActionList {
 
 	async run(name, brain, page) {
 		const entry = this.#list.get(name)
+		if (!entry) throw new Error(`Action '${name}' not found in this action list`)
 		if (brain.run.payloadId && entry.serverBlocked) throw new ActionError(name, 'not available in server mode')
 
 		const startTime = Date.now()

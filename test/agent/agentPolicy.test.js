@@ -8,8 +8,6 @@ test('AgentPolicy allows curated actions', () => {
 	assert.strictEqual(policy.isAllowedAction('navigate'), true)
 	assert.strictEqual(policy.isAllowedAction('click'), true)
 	assert.strictEqual(policy.isAllowedAction('paginateElements'), true)
-	assert.strictEqual(policy.isAllowedAction('pickElement'), false)
-	assert.strictEqual(new AgentPolicy({ exportMode: true }).isAllowedAction('pickElement'), true)
 	assert.strictEqual(policy.isAllowedAction('inspectElement'), false)
 	assert.strictEqual(new AgentPolicy({ visionAvailable: true }).isAllowedAction('inspectElement'), true)
 	assert.strictEqual(policy.isAllowedAction('listTabs'), true)
@@ -207,13 +205,3 @@ test('AgentPolicy rejects getElements selectors outside the observation', () => 
 	)
 })
 
-test('AgentPolicy allows pickElement selectors from the observation during export', () => {
-	const policy = new AgentPolicy({ exportMode: true })
-	const knownSelectors = new Set(['p.result'])
-
-	assert.doesNotThrow(() =>
-		policy.validateAction('pickElement', { selector: 'p.result' }, {
-			knownSelectors,
-		}),
-	)
-})

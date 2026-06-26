@@ -1,42 +1,80 @@
+/**
+ * Tests for export-mode answer parsing (replaces the removed mustPickBeforeAnswer / pickElement flow).
+ * In export mode the model embeds the answer and selector as JSON:
+ *   {"answer":"Example Domain","selector":"h1"}
+ */
 import test from 'node:test'
 import assert from 'node:assert'
-import { mustPickBeforeAnswer } from '../../src/agent/agentEnvironment.js'
+import { resolveAssistantAnswer } from '../../src/agent/agentMessages.js'
 
-test('mustPickBeforeAnswer requires pick after navigate when exporting', () => {
-	assert.strictEqual(
-		mustPickBeforeAnswer([{ action: 'navigate', params: { url: 'https://example.com' } }], null, true),
-		true,
-	)
+test('resolveAssistantAnswer extracts JSON answer and selector in export mode', () => {
+	const message = {
+		role: 'assistant',
+		content: JSON.stringify({ answer: 'Example Domain', selector: 'h1.title' }),
+	}
+	const result = resolveAssistantAnswer(message, true)
+
+	assert.strictEqual(result.text, 'Example Domain')
+	assert.strictEqual(result.selector, 'h1.title')
 })
 
-test('mustPickBeforeAnswer skips pick requirement outside export mode', () => {
-	assert.strictEqual(
-		mustPickBeforeAnswer([{ action: 'navigate', params: { url: 'https://example.com' } }], null, false),
-		false,
-	)
+test('resolveAssistantAnswer returns null selector when JSON has no selector', () => {
+	const message = {
+		role: 'assistant',
+		content: JSON.stringify({ answer: 'Some text' }),
+	}
+	const result = resolveAssistantAnswer(message, true)
+
+	assert.strictEqual(result.text, 'Some text')
+	assert.strictEqual(result.selector, null)
 })
 
-test('mustPickBeforeAnswer allows answer after getElements without pick', () => {
-	assert.strictEqual(
-		mustPickBeforeAnswer(
-			[
-				{ action: 'navigate', params: { url: 'https://example.com' } },
-				{ action: 'getElements', params: { selector: 'h1' } },
-			],
-			null,
-			true,
-		),
-		false,
-	)
+test('resolveAssistantAnswer trims whitespace from extracted answer text', () => {
+	const message = {
+		role: 'assistant',
+		content: JSON.stringify({ answer: '  trimmed  ', selector: 'p' }),
+	}
+	const result = resolveAssistantAnswer(message, true)
+
+	assert.strictEqual(result.text, 'trimmed')
 })
 
-test('mustPickBeforeAnswer clears once a pick is active', () => {
-	assert.strictEqual(
-		mustPickBeforeAnswer([{ action: 'navigate', params: { url: 'https://example.com' } }], 'h1', true),
-		false,
-	)
+test('resolveAssistantAnswer falls back to raw text when export-mode JSON is malformed', () => {
+	const message = { role: 'assistant', content: 'not valid JSON' }
+	const result = resolveAssistantAnswer(message, true)
+
+	assert.strictEqual(result.text, 'not valid JSON')
+	assert.strictEqual(result.selector, null)
 })
 
-test('mustPickBeforeAnswer allows answers without navigate', () => {
-	assert.strictEqual(mustPickBeforeAnswer([], null, true), false)
+test('resolveAssistantAnswer returns plain text and null selector in non-export mode', () => {
+	const message = { role: 'assistant', content: 'plain answer' }
+	const result = resolveAssistantAnswer(message, false)
+
+	assert.strictEqual(result.text, 'plain answer')
+	assert.strictEqual(result.selector, null)
+})
+
+test('resolveAssistantAnswer ignores selector in non-export mode even when JSON is present', () => {
+	const message = {
+		role: 'assistant',
+		content: JSON.stringify({ answer: 'Foo', selector: 'div' }),
+	}
+	// Non-export mode: returns raw JSON string, not parsed.
+	const result = resolveAssistantAnswer(message, false)
+
+	assert.strictEqual(result.selector, null)
+})
+
+test('resolveAssistantAnswer handles multi-part content arrays in export mode', () => {
+	const message = {
+		role: 'assistant',
+		content: [
+			{ type: 'text', text: JSON.stringify({ answer: 'Domain', selector: 'h1' }) },
+		],
+	}
+	const result = resolveAssistantAnswer(message, true)
+
+	assert.strictEqual(result.text, 'Domain')
+	assert.strictEqual(result.selector, 'h1')
 })

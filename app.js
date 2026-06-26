@@ -5,7 +5,7 @@ import { v4 as uuidv4 } from 'uuid'
 import Grabber from './src/core/grabber/Grabber.js'
 import AgentRunner from './src/agent/AgentRunner.js'
 import { validateAgentCliOptions } from './src/agent/agentCli.js'
-import Engine from './packages/core/Engine.js'
+import Engine from '#core/Engine.js'
 import CliPresenter from './src/infrastructure/presenter/CliPresenter.js'
 import LoggerPresenter from './src/infrastructure/presenter/LoggerPresenter.js'
 import { present, presentError, setPresenter, setServerMode } from './src/infrastructure/presenter/present.js'
@@ -27,6 +27,9 @@ const {
 
 setServerMode(serverMode)
 setPresenter(serverMode ? new LoggerPresenter() : new CliPresenter())
+
+// Active instances tracker for graceful shutdowns
+let activeGrabberInstance = null
 
 const startServerMode = async (grabber) => {
 	const app = express()
@@ -100,6 +103,7 @@ const runAgentMode = async () => {
 
 const runGrabMode = async () => {
 	const grabber = new Grabber()
+	activeGrabberInstance = grabber // Store ref for process listener hooks
 	customize(grabber)
 
 	await grabber.init(puppeteerOptions)
@@ -111,6 +115,22 @@ const runGrabMode = async () => {
 
 	await grabber.grab()
 }
+
+// Graceful termination handling
+const handleShutdown = async (signal) => {
+	logger.info(`Received ${signal}. Shutting down gracefully...`)
+	if (activeGrabberInstance && typeof activeGrabberInstance.destroy === 'function') {
+		try {
+			await activeGrabberInstance.destroy()
+		} catch (err) {
+			logger.error('Error closing browser resources during shutdown', err)
+		}
+	}
+	process.exit(0)
+}
+
+process.on('SIGINT', () => handleShutdown('SIGINT'))
+process.on('SIGTERM', () => handleShutdown('SIGTERM'))
 
 try {
 	validateAgentCliOptions(cliArgs)
