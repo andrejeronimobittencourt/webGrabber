@@ -101,19 +101,16 @@ export default class OllamaClient {
 			return ''
 		}
 
-		const contextParts = []
-		if (context.instruction) {
-			contextParts.push(`Overall Goal: ${context.instruction}`)
-		}
-		if (context.lastIntent) {
-			contextParts.push(`Agent's Latest Intent: ${context.lastIntent}`)
-		}
-
 		const contextLine = [context.title, context.url].filter(Boolean).join(' — ')
-		const prompt =
-			'Describe the visible page content in this viewport image. Focus on identifying and describing elements that are relevant to the overall goal or the agent\'s intent.' +
-			(contextParts.length > 0 ? `\n\n${contextParts.join('\n')}` : '') +
-			(contextLine ? `\n\nPage context: ${contextLine}` : '')
+
+		const backgroundParts = []
+
+		const prompt = [
+			'You are a page-description assistant. Your ONLY job is to describe what is currently visible on this page. Do NOT suggest actions, next steps, or what the agent should do.',
+			'Rules: (1) State what the page shows right now. (2) Mention 1-2 prominent interactive elements visible in the viewport if relevant to the goal. (3) Max 2 sentences. (4) No action suggestions. No future tense.',
+			...backgroundParts,
+			...(contextLine ? [`Page context: ${contextLine}`] : []),
+		].join('\n')
 
 		return this.#describeViewImage(viewportBase64, prompt)
 	}
@@ -129,21 +126,18 @@ export default class OllamaClient {
 			return ''
 		}
 
-		const contextParts = []
-		if (context.instruction) {
-			contextParts.push(`Overall Goal: ${context.instruction}`)
-		}
-		if (context.lastIntent) {
-			contextParts.push(`Agent's Latest Intent: ${context.lastIntent}`)
-		}
-
 		const contextLine = [context.title, context.url, context.selector, context.elementText]
 			.filter(Boolean)
 			.join(' — ')
-		const prompt =
-			'Describe the visible content of this element crop. Focus on identifying and describing elements that are relevant to the overall goal or the agent\'s intent.' +
-			(contextParts.length > 0 ? `\n\n${contextParts.join('\n')}` : '') +
-			(contextLine ? `\n\nElement context: ${contextLine}` : '')
+
+		const backgroundParts = []
+
+		const prompt = [
+			'You are a page-description assistant. Your ONLY job is to describe what is currently visible in this element crop. Do NOT suggest actions, next steps, or what the agent should do.',
+			'Rules: (1) Describe the visible content of this element. (2) Note any text, labels, or values shown. (3) Max 2 sentences. (4) No action suggestions.',
+			...backgroundParts,
+			...(contextLine ? [`Element context: ${contextLine}`] : []),
+		].join('\n')
 
 		return this.#describeViewImage(elementBase64, prompt)
 	}

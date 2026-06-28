@@ -1,27 +1,27 @@
-import { resolveElementOffset } from './agentConfig.js'
+import { resolveHtmlOffset } from './agentConfig.js'
 
 /**
- * @typedef {Object} InteractiveElementListState
+ * @typedef {Object} HtmlPaginationState
  * @property {number} offset
  */
 
 /**
- * @returns {InteractiveElementListState}
+ * @returns {HtmlPaginationState}
  */
-export function createDefaultInteractiveElementListState() {
+export function createDefaultHtmlPaginationState() {
 	return { offset: 0 }
 }
 
 /**
- * @param {InteractiveElementListState} currentState
+ * @param {HtmlPaginationState} currentState
  * @param {{ offset?: number }} params
- * @returns {InteractiveElementListState}
+ * @returns {HtmlPaginationState}
  */
-export function resolveInteractiveElementListState(currentState, params = {}) {
+export function resolveHtmlPaginationState(currentState, params = {}) {
 	return {
 		offset:
 			params.offset === undefined || params.offset === null
 				? currentState.offset
-				: resolveElementOffset(params.offset),
+				: resolveHtmlOffset(params.offset),
 	}
 }

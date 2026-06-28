@@ -1,12 +1,16 @@
 import Engine from '../../packages/core/Engine.js'
 import constants from '../../packages/core/utils/constants.js'
+
+import { delayMs } from '../../packages/core/utils/delayMs.js'
 import { present } from '../../packages/core/infrastructure/presenter/present.js'
 import AgentPolicy from './AgentPolicy.js'
 import { isMutatingAgentTool } from './AgentObservationCache.js'
 import { mapAgentToolToEngineAction } from './AgentToolMapper.js'
 import {
-	resolveElementPageSize,
 	AGENT_QUIET_TOOLS,
+	MAX_TOOL_HISTORY_STEPS,
+	resolveHtmlPageSize,
+	SKIP_RESULT_TOOLS,
 	shouldRefreshKnownSelectorsAfterTool,
 } from './agentConfig.js'
 import { isAgentVisionAvailable } from './agentModels.js'
@@ -16,9 +20,7 @@ import {
 	buildRepeatedStalledActionFeedback,
 	observationFingerprintsEqual,
 } from './agentProgress.js'
-import {
-	registerObservationSelectors,
-} from './agentEnvironment.js'
+
 import OllamaClient from './OllamaClient.js'
 import { buildAgentTools } from './ToolSchemaBuilder.js'
 import {
@@ -29,18 +31,18 @@ import {
 import { loadGrabCatalog } from '../utils/loadGrabs.js'
 import { exportAgentRunGrab } from './GrabExporter.js'
 import {
-	createDefaultInteractiveElementListState,
-	resolveInteractiveElementListState,
+	createDefaultHtmlPaginationState,
+	resolveHtmlPaginationState,
 } from './interactiveElementList.js'
 import {
-	buildElementsPageMeta,
+	buildHtmlPageMeta,
 	clearPageSnapshotCache,
 	attachPageVisionDescription,
 	inspectElement,
 	isAgentPreNavigatePageUrl,
-	paginateElements,
 	observePage,
-	refreshKnownSelectorsFromPage,
+	paginateHtml,
+	shouldAttachPageVision,
 } from './observePage.js'
 import { resolveAgentToolName } from './agentToolNameResolver.js'
 import { safeAgentPageUrl, waitForAgentPageSettle } from './waitForAgentPageSettle.js'
@@ -55,12 +57,10 @@ import {
 	buildAgentModelMessages,
 	buildAgentToolResultForModel,
 	EMPTY_ASSISTANT_NUDGE,
-	EXPORT_ANSWER_SELECTOR_NUDGE,
 	formatAgentToolErrorForUser,
 	formatAgentToolFeedbackForModel,
 	hasAssistantToolCalls,
 	isEmptyAssistantTurn,
-	resolveAssistantAnswer,
 } from './agentMessages.js'
 
 /**
@@ -140,7 +140,7 @@ export default class AgentRunner {
 		brain.run.agentMode = true
 		brain.run.grabCatalog = grabCatalog
 		brain.run.grabCallStack = []
-		brain.run.elementList = createDefaultInteractiveElementListState()
+		brain.run.htmlPagination = createDefaultHtmlPaginationState()
 		/** @type {AgentRunResult['steps']} */
 		const steps = []
 		const tools = buildAgentTools({ dynamicTools, visionAvailable, exportMode })
@@ -175,7 +175,7 @@ export default class AgentRunner {
 				const observeOptions = {
 					brain,
 					hasNavigated,
-					elementList: brain.run.elementList,
+					htmlPagination: brain.run.htmlPagination,
 					instruction,
 					lastIntent: steps.at(-1)?.reason,
 				}
@@ -195,8 +195,8 @@ export default class AgentRunner {
 					observation = {
 						url: await safeAgentPageUrl(page),
 						title: '',
-						elements: [],
-						elementsPage: buildElementsPageMeta(0, 0, resolveElementPageSize()),
+						html: '',
+						htmlPage: buildHtmlPageMeta(0, 0, resolveHtmlPageSize()),
 						tabs: { activeTabKey: null, tabs: [] },
 						observationError,
 					}
@@ -212,9 +212,6 @@ export default class AgentRunner {
 						{ force: true },
 					)
 				}
-				knownSelectors.clear()
-				registerObservationSelectors(knownSelectors, observation.elements)
-
 				const currentObservationFingerprint = buildObservationFingerprint(
 					/** @type {import('./observePage.js').PageObservation} */ (observation),
 				)
@@ -246,6 +243,7 @@ export default class AgentRunner {
 					visionAvailable,
 					exportMode,
 				})
+
 
 				const completion = await this.#client.chat(modelMessages, tools)
 				const choice = completion.choices?.[0]
@@ -297,8 +295,7 @@ export default class AgentRunner {
 							policy.validateAction(toolName, params, {
 								currentUrl: page.url(),
 								knownSelectors,
-								elements: observation.elements,
-								elementsPage: observation.elementsPage,
+								htmlPage: observation.htmlPage,
 							})
 
 							if (dynamicRegistry.has(toolName)) {
@@ -308,26 +305,33 @@ export default class AgentRunner {
 									page,
 									grabCatalog,
 								})
-							} else if (toolName === 'paginateElements') {
-								const nextState = resolveInteractiveElementListState(
-									brain.run.elementList,
+							} else if (toolName === 'paginateHtml') {
+								const nextState = resolveHtmlPaginationState(
+									brain.run.htmlPagination,
 									params,
 								)
-								brain.run.elementList = nextState
-								result = await paginateElements(page, {
+								brain.run.htmlPagination = nextState
+								result = await paginateHtml(page, {
 									offset: nextState.offset,
 									limit: params.limit,
 								}, brain)
-								observation.elements = result.elements
-								observation.elementsPage = result.elementsPage
-								knownSelectors.clear()
-								registerObservationSelectors(knownSelectors, result.elements)
+								observation.html = result.html
+								observation.htmlPage = result.htmlPage
 							} else if (toolName === 'listTabs') {
 								result = await listAgentTabs(brain)
 							} else if (toolName === 'switchTab') {
 								result = await switchAgentTab(brain, params.tabKey)
 							} else if (toolName === 'inspectElement') {
 								result = await inspectElement(page, this.#client, params)
+							} else if (toolName === 'answer') {
+								if (exportMode && !params.selector) {
+									toolError = 'Export mode: your answer must include the selector field.'
+									pendingFeedback.push(toolError)
+								} else {
+									answer = params.text
+									answerSelector = params.selector || null
+									result = { success: true }
+								}
 							} else {
 								const mapped = mapAgentToolToEngineAction(toolName, params)
 								brain.run.params = mapped.params
@@ -335,22 +339,37 @@ export default class AgentRunner {
 								result = brain.recall(constants.inputKey)
 							}
 						} catch (error) {
-							toolError = error instanceof Error ? error.message : String(error)
-							pendingFeedback.push(
-								formatAgentToolFeedbackForModel(toolName, error, knownSelectors),
-							)
-							result = buildAgentToolResultForModel(error, knownSelectors)
-							present(
-								[
-									{ text: 'Agent tool failed: ', color: 'red', style: 'bold' },
-									{
-										text: formatAgentToolErrorForUser(error),
-										color: 'whiteBright',
-									},
-								],
-								brain,
-								{ force: true },
-							)
+							const errorMessage = error instanceof Error ? error.message : String(error)
+							// A navigate timeout is a soft failure when the page actually loaded.
+							// Heavy pages (NYT, etc.) hit background-resource timeouts but the DOM is ready.
+							// We detect this by checking the page URL changed away from about:blank.
+							const isNavigateTimeout =
+								toolName === 'navigate' &&
+								errorMessage.includes('timeout') &&
+								page.url() !== 'about:blank'
+							
+							if (isNavigateTimeout) {
+								// Page loaded — treat as success with a warning note
+								toolError = null
+								pendingFeedback.push(`navigate: page loaded at ${page.url()} despite timeout (background resources still loading — this is normal)`)
+							} else {
+								toolError = errorMessage
+								pendingFeedback.push(
+									formatAgentToolFeedbackForModel(toolName, error, knownSelectors),
+								)
+								result = buildAgentToolResultForModel(error, knownSelectors)
+								present(
+									[
+										{ text: 'Agent tool failed: ', color: 'red', style: 'bold' },
+										{
+											text: formatAgentToolErrorForUser(error),
+											color: 'whiteBright',
+										},
+									],
+									brain,
+									{ force: true },
+								)
+							}
 						}
 
 						steps.push({
@@ -373,15 +392,15 @@ export default class AgentRunner {
 								dynamicToolNames.has(toolName)) &&
 							!toolError
 						) {
-							knownSelectors.clear()
+							if (typeof brain.browser?.activePage !== 'undefined') {
+								try {
+									await delayMs(500) // Allow browser to begin navigation/mutations before checking readyState
+									await waitForAgentPageSettle(brain.browser.activePage)
+								} catch (e) {
+									// ignore
+								}
+							}
 							await syncAgentBrowserTabs(brain)
-
-							await waitForAgentPageSettle(brain.browser.activePage)
-							await refreshKnownSelectorsFromPage(
-								brain.browser.activePage,
-								brain,
-								knownSelectors,
-							)
 						} else if (toolName === 'type' && !toolError && typeof params.selector === 'string') {
 							knownSelectors.add(params.selector)
 						}
@@ -389,7 +408,13 @@ export default class AgentRunner {
 
 					if (usedMutatingTool) {
 						clearPageSnapshotCache(brain)
-						brain.run.elementList = createDefaultInteractiveElementListState()
+						if (brain.browser.activePage.url() !== observation.url) {
+							brain.run.htmlPagination = createDefaultHtmlPaginationState()
+						}
+					}
+
+					if (answer) {
+						break
 					}
 
 					continue
@@ -407,20 +432,7 @@ export default class AgentRunner {
 					continue
 				}
 
-				const { text: answerText, selector: resolvedSelector } = resolveAssistantAnswer(
-					assistantMessage,
-					exportMode,
-				)
-
-				if (exportMode && !resolvedSelector) {
-					// Nudge the model to re-answer with the required selector field.
-					pendingFeedback.push(EXPORT_ANSWER_SELECTOR_NUDGE)
-					continue
-				}
-
-				answer = answerText
-				answerSelector = resolvedSelector
-				break
+				pendingFeedback.push('You must use the `answer` tool to provide your final answer. Do not answer in plain text.')
 			}
 
 			if (!answer) {

@@ -34,16 +34,16 @@ export function formatObservationTabs(tabs) {
 }
 
 /**
- * Model-facing pagination summary for the current elements slice.
- * @param {PageObservation['elementsPage']} elementsPage
+ * Model-facing pagination summary for the current HTML chunk.
+ * @param {PageObservation['htmlPage']} htmlPage
  */
-export function formatElementsPageForModel(elementsPage) {
+export function formatHtmlPageForModel(htmlPage) {
 	return {
-		page: elementsPage.pageIndex + 1,
-		totalPages: elementsPage.totalPages,
-		totalElements: elementsPage.total,
-		hasMore: elementsPage.hasMore,
-		nextOffset: elementsPage.hasMore ? elementsPage.offset + elementsPage.limit : null,
+		page: htmlPage.pageIndex + 1,
+		totalPages: htmlPage.totalPages,
+		totalLength: htmlPage.total,
+		hasMore: htmlPage.hasMore,
+		nextOffset: htmlPage.hasMore ? htmlPage.offset + htmlPage.limit : null,
 	}
 }
 
@@ -52,19 +52,15 @@ export function formatElementsPageForModel(elementsPage) {
  * @param {PageObservation} observation
  */
 export function formatObservationForModel(observation) {
-	const elements = [...(observation.elements ?? [])].sort(
-		(left, right) => Number(right.interactable) - Number(left.interactable),
-	)
-
 	/** @type {Record<string, unknown>} */
 	const formatted = {
 		url: observation.url,
 		title: observation.title,
-		elements,
+		html: observation.html,
 	}
 
-	if (observation.elementsPage) {
-		formatted.elementsPage = formatElementsPageForModel(observation.elementsPage)
+	if (observation.htmlPage) {
+		formatted.htmlPage = formatHtmlPageForModel(observation.htmlPage)
 	}
 
 	if (observation.visualSummary) {
@@ -82,20 +78,4 @@ export function formatObservationForModel(observation) {
 	}
 
 	return formatted
-}
-
-/**
- * Find elements whose visible text matches a query (case-insensitive).
- * @param {PageElement[]} elements
- * @param {string} text
- * @returns {PageElement[]}
- */
-export function findElementsByText(elements, text) {
-	const query = text.trim().toLowerCase()
-
-	if (!query) {
-		return []
-	}
-
-	return elements.filter((element) => element.text.toLowerCase().includes(query))
 }

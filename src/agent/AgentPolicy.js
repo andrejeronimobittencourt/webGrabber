@@ -1,6 +1,4 @@
-import { SELECTOR_NOT_IN_OBSERVATION } from './agentEnvironment.js'
 import { AgentValidationError } from './agentErrors.js'
-import { findElementsByText } from './agentObservationFormat.js'
 import { validateGrabParameters } from '../../packages/core/grabParameters.js'
 import { BUILTIN_AGENT_TOOL_NAMES, EXPORT_AGENT_TOOL_NAMES, VISION_AGENT_TOOL_NAMES } from '../../packages/core/utils/builtinAgentToolNames.js'
 import { suggestAgentToolName } from './agentToolNameResolver.js'
@@ -90,9 +88,23 @@ export default class AgentPolicy {
 	}
 
 	/**
+	 * @param {string} toolName
+	 * @param {Record<string, unknown>} params
+	 */
+	validateRequiredSelector(toolName, params) {
+		const selector = typeof params.selector === 'string' ? params.selector.trim() : ''
+
+		if (selector) {
+			return
+		}
+
+		throw AgentValidationError.missingSelector(toolName)
+	}
+
+	/**
 	 * @param {string} name
 	 * @param {Record<string, unknown>} params
-	 * @param {{ currentUrl?: string, knownSelectors?: Set<string>, elements?: import('./observePage.js').PageElement[], elementsPage?: { hasMore?: boolean } }} [context]
+	 * @param {{ currentUrl?: string, knownSelectors?: Set<string>, htmlPage?: { hasMore?: boolean } }} [context]
 	 */
 	validateAction(name, params, context = {}) {
 		const dynamicEntry = this.#dynamicRegistry.get(name)
@@ -118,75 +130,12 @@ export default class AgentPolicy {
 			throw AgentValidationError.invalidParams('switchTab', 'tabKey string is required')
 		}
 
-		if (name === 'paginateElements' && context.elementsPage?.hasMore === false) {
+		if (name === 'paginateHtml' && context.htmlPage?.hasMore === false) {
 			throw AgentValidationError.paginationExhausted()
 		}
 
 		if (REQUIRED_SELECTOR_ACTIONS.has(name)) {
-			this.validateRequiredSelector(name, params, context.elements ?? [])
-		}
-
-		if (SELECTOR_ACTIONS.has(name) && typeof params.selector === 'string') {
-			this.validateObservationSelector(
-				params.selector,
-				context.knownSelectors,
-				context.elements ?? [],
-			)
-		}
-
-		if (INTERACTION_SELECTOR_ACTIONS.has(name) && typeof params.selector === 'string') {
-			this.validateInteractableSelector(name, params.selector, context.elements ?? [])
-		}
-	}
-
-	/**
-	 * @param {string} toolName
-	 * @param {Record<string, unknown>} params
-	 * @param {import('./observePage.js').PageElement[]} elements
-	 */
-	validateRequiredSelector(toolName, params, elements) {
-		const selector = typeof params.selector === 'string' ? params.selector.trim() : ''
-
-		if (selector) {
-			return
-		}
-
-		const textHint = typeof params.text === 'string' ? params.text : ''
-		const suggestedElements = textHint ? findElementsByText(elements, textHint) : []
-
-		throw AgentValidationError.missingSelector(toolName, suggestedElements)
-	}
-
-	/**
-	 * @param {string} selector
-	 * @param {Set<string> | undefined} knownSelectors
-	 * @param {import('./observePage.js').PageElement[]} elements
-	 */
-	validateObservationSelector(selector, knownSelectors, elements = []) {
-		if (!knownSelectors || knownSelectors.size === 0) {
-			throw AgentValidationError.observationSelectorsEmpty(selector, SELECTOR_NOT_IN_OBSERVATION)
-		}
-
-		if (!knownSelectors.has(selector)) {
-			const suggestedElements = findElementsByText(elements, selector)
-			throw AgentValidationError.selectorNotInObservation(
-				selector,
-				SELECTOR_NOT_IN_OBSERVATION,
-				suggestedElements,
-			)
-		}
-	}
-
-	/**
-	 * @param {string} toolName
-	 * @param {string} selector
-	 * @param {import('./observePage.js').PageElement[]} elements
-	 */
-	validateInteractableSelector(toolName, selector, elements) {
-		const element = elements.find((entry) => entry.selector === selector)
-
-		if (element?.interactable === false) {
-			throw AgentValidationError.notInteractable(toolName, selector)
+			this.validateRequiredSelector(name, params)
 		}
 	}
 

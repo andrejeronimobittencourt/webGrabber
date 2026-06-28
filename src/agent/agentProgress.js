@@ -32,11 +32,10 @@ export function buildObservationFingerprint(observation) {
 	return JSON.stringify({
 		url: observation.url ?? '',
 		title: observation.title ?? '',
-		elements: (observation.elements ?? []).map((element) => [element.selector, element.text]),
-		elementsPage: observation.elementsPage
+		htmlPage: observation.htmlPage
 			? {
-				offset: observation.elementsPage.offset,
-				total: observation.elementsPage.total,
+				offset: observation.htmlPage.offset,
+				total: observation.htmlPage.total,
 			}
 			: null,
 		pickedSelector: observation.pickedSelector ?? null,

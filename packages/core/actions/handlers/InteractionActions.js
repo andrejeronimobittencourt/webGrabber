@@ -9,10 +9,33 @@ import { delayMs } from '../../utils/delayMs.js'
 
 const WAITUNTIL = 'networkidle0'
 
+async function resolveActionConfig(page, brain) {
+	const config = { timeout: 5000, maxAttempts: 3 }
+
+	if (brain.run.agentMode) {
+		const readyState = await page.evaluate(() => document.readyState).catch(() => 'complete')
+		if (readyState === 'complete') {
+			config.timeout = 5000
+			config.maxAttempts = 1
+		}
+	}
+
+	if (brain.run.params.timeout !== undefined) {
+		config.timeout = brain.run.params.timeout
+	}
+
+	if (brain.run.params.maxAttempts !== undefined) {
+		config.maxAttempts = brain.run.params.maxAttempts
+	}
+
+	return config
+}
+
 export default class InteractionActions {
 	static register(actionList) {
 		actionList.add('click', async (brain, page) => {
 			const { selector, attribute, text } = brain.run.params
+			const config = await resolveActionConfig(page, brain)
 
 			const performClick = async () => {
 				try {
@@ -50,8 +73,39 @@ export default class InteractionActions {
 							reason: 'No matching element found',
 						})
 					} else {
-						await page.waitForSelector(selector, { visible: true, timeout: 5000 })
-						await page.click(selector)
+						let clicked = false
+						try {
+							await page.waitForSelector(selector, { visible: true, timeout: config.timeout })
+							
+							// Execute physical click (for sites that require trusted events)
+							await page.click(selector).catch(() => {})
+							
+							// ALWAYS execute native JS click to bypass invisible ad overlays
+							clicked = await page.evaluate((sel) => {
+								const el = document.querySelector(sel)
+								if (el) {
+									el.click()
+									return true
+								}
+								return false
+							}, selector)
+						} catch {
+							// Fallback if waitForSelector fails (e.g., Shadow DOM)
+							clicked = await page.evaluate((sel) => {
+								const el = document.querySelector(sel)
+								if (el) {
+									el.click()
+									return true
+								}
+								return false
+							}, selector)
+						}
+						if (!clicked) {
+							throw new SelectorError('click', selector, {
+								originalError: 'Selector not found or not visible',
+								pageUrl: safePageUrl(page),
+							})
+						}
 					}
 				} catch (error) {
 					if (error instanceof SelectorError) {
@@ -66,7 +120,7 @@ export default class InteractionActions {
 			}
 
 			await retryWithBackoff(performClick, {
-				maxAttempts: 3,
+				maxAttempts: config.maxAttempts,
 				initialDelay: 1000,
 				retryOn: isRetryableError,
 				brain,
@@ -104,7 +158,8 @@ export default class InteractionActions {
 			await page.click(selector)
 		})
 		actionList.add('type', async (brain, page) => {
-			const { selector, text, secret = false } = brain.run.params
+			const { selector, text, secret = false, pressEnter = false } = brain.run.params
+			const config = await resolveActionConfig(page, brain)
 
 			const performType = async () => {
 				try {
@@ -112,8 +167,20 @@ export default class InteractionActions {
 						{ text: ': Typing ', color: 'white', style: 'italic' },
 						{ text: secret ? '•••••' : text, color: 'gray', style: 'italic' },
 					], brain)
-					await page.waitForSelector(selector, { visible: true, timeout: 5000 })
+					await page.waitForSelector(selector, { visible: true, timeout: config.timeout })
+					if (brain.run.agentMode) {
+						// Triple-click selects all existing text so typing replaces it instead of appending.
+						await page.click(selector, { clickCount: 3 })
+					}
 					await page.type(selector, text)
+					if (pressEnter) {
+						await delayMs(300)
+						await Promise.all([
+							page.waitForNavigation({ waitUntil: 'domcontentloaded', timeout: 5000 }).catch(() => {}),
+							page.keyboard.press('Enter')
+						])
+						await delayMs(1500)
+					}
 				} catch (error) {
 					throw new SelectorError('type', selector, {
 						originalError: error.message,
@@ -123,7 +190,7 @@ export default class InteractionActions {
 			}
 
 			await retryWithBackoff(performType, {
-				maxAttempts: 3,
+				maxAttempts: config.maxAttempts,
 				initialDelay: 1000,
 				retryOn: isRetryableError,
 				brain,
@@ -131,9 +198,10 @@ export default class InteractionActions {
 		})
 		actionList.add('pressKey', async (brain, page) => {
 			const { key, selector } = brain.run.params
+			const config = await resolveActionConfig(page, brain)
 
 			if (selector) {
-				await page.waitForSelector(selector, { visible: true, timeout: 5000 })
+				await page.waitForSelector(selector, { visible: true, timeout: config.timeout })
 				await page.focus(selector)
 			}
 

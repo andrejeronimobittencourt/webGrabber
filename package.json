@@ -1,7 +1,7 @@
 {
   "name": "@andrejeronimobittencourt/webgrabber",
-  "version": "5.3.1",
-  "description": "Config based web scraper & browser automation",
+  "version": "5.4.0",
+  "description": "Config based web scraper & browser automation with AI agent mode",
   "main": "app.js",
   "type": "module",
   "imports": {

@@ -71,6 +71,16 @@ export default class PuppeteerPageFactory {
 		const page = await this.#puppeteer.browser.newPage()
 		const viewport = this.#puppeteer.viewport
 		if (viewport) await page.setViewport(viewport)
+		
+		// Auto-dismiss dialogs to prevent JS execution hangs during agent clicks
+		page.on('dialog', async (dialog) => {
+			try {
+				await dialog.dismiss()
+			} catch (e) {
+				// Ignore errors if dialog was already handled
+			}
+		})
+		
 		return page
 	}
 

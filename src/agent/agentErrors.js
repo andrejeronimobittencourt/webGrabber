@@ -1,5 +1,3 @@
-/** @typedef {import('./observePage.js').PageElement} PageElement */
-
 /**
  * Agent validation error with separate CLI and model-facing messages.
  */
@@ -7,57 +5,26 @@ export class AgentValidationError extends Error {
 	/** @type {string} */
 	userMessage
 
-	/** @type {PageElement[] | undefined} */
-	suggestedElements
-
 	/**
 	 * @param {string} userMessage Short text for CLI logs.
 	 * @param {string} modelMessage Full text returned to the reason model.
-	 * @param {{ suggestedElements?: PageElement[] }} [options]
 	 */
-	constructor(userMessage, modelMessage, options = {}) {
+	constructor(userMessage, modelMessage) {
 		super(modelMessage)
 		this.name = 'AgentValidationError'
 		this.userMessage = userMessage
-		this.suggestedElements = options.suggestedElements
 	}
 
-	/**
-	 * @param {string} selector
-	 * @param {string} hint
-	 * @returns {AgentValidationError}
-	 */
-	static observationSelectorsEmpty(selector, hint) {
-		return new AgentValidationError(
-			'Selector is not in the observation yet',
-			`Selector "${selector}" is not in elements[]. ${hint}`,
-		)
-	}
 
-	/**
-	 * @param {string} selector
-	 * @param {string} hint
-	 * @param {PageElement[]} [suggestedElements]
-	 * @returns {AgentValidationError}
-	 */
-	static selectorNotInObservation(selector, hint, suggestedElements = []) {
-		return new AgentValidationError(
-			'Selector is not in the current observation',
-			`Selector "${selector}" is not in elements[]. ${hint}`,
-			{ suggestedElements },
-		)
-	}
 
 	/**
 	 * @param {string} toolName
-	 * @param {PageElement[]} [suggestedElements]
 	 * @returns {AgentValidationError}
 	 */
-	static missingSelector(toolName, suggestedElements = []) {
+	static missingSelector(toolName) {
 		return new AgentValidationError(
 			`${toolName} requires a selector`,
 			`${toolName}: missing selector parameter.`,
-			{ suggestedElements },
 		)
 	}
 
@@ -84,17 +51,7 @@ export class AgentValidationError extends Error {
 		)
 	}
 
-	/**
-	 * @param {string} toolName
-	 * @param {string} selector
-	 * @returns {AgentValidationError}
-	 */
-	static notInteractable(toolName, selector) {
-		return new AgentValidationError(
-			'Element is not interactable',
-			`${toolName}: elements[].interactable is false for "${selector}".`,
-		)
-	}
+
 
 	/**
 	 * @returns {AgentValidationError}
@@ -102,7 +59,7 @@ export class AgentValidationError extends Error {
 	static paginationExhausted() {
 		return new AgentValidationError(
 			'All elements are already listed',
-			'paginateElements rejected: elementsPage.hasMore is false.',
+			'paginateHtml rejected: htmlPage.hasMore is false.',
 		)
 	}
 

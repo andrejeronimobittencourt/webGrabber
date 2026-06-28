@@ -1,16 +1,16 @@
-/** Default number of interactive elements per observation page. */
-export const DEFAULT_AGENT_ELEMENT_PAGE_SIZE = 25
+/** Default number of HTML characters per observation page. */
+export const DEFAULT_AGENT_HTML_PAGE_SIZE = 100000
 
 /** Agent tools that are exploration-only and should not be exported to grabs. */
 export const AGENT_ONLY_EXPORT_ACTIONS = new Set([
 	'inspectElement',
-	'paginateElements',
+	'paginateHtml',
 	'listTabs',
 	'switchTab',
 ])
 
 /** Agent tools omitted from normal CLI progress output. */
-export const AGENT_QUIET_TOOLS = new Set([])
+export const AGENT_QUIET_TOOLS = new Set(['answer'])
 
 /** Agent tools that consume a pick for interaction rather than read-and-answer export. */
 export const PICK_CONSUMING_ACTIONS = new Set(['click', 'inspectElement', 'pressKey', 'type'])
@@ -35,7 +35,7 @@ export const PAGE_LOOP_MONITOR_TOOLS = new Set([
 	'click',
 	'getElements',
 	'inspectElement',
-	'paginateElements',
+	'paginateHtml',
 	'pressKey',
 ])
 
@@ -57,9 +57,9 @@ export const SKIP_RESULT_TOOLS = new Set([
  * Resolve the interactive-element page size for agent observations.
  * @returns {number}
  */
-export function resolveElementPageSize() {
+export function resolveHtmlPageSize() {
 	return Number.parseInt(
-		process.env.AGENT_ELEMENT_PAGE_SIZE ?? String(DEFAULT_AGENT_ELEMENT_PAGE_SIZE),
+		process.env.AGENT_HTML_PAGE_SIZE ?? String(DEFAULT_AGENT_HTML_PAGE_SIZE),
 		10,
 	)
 }
@@ -69,13 +69,13 @@ export function resolveElementPageSize() {
  * @param {number | undefined} offset
  * @returns {number}
  */
-export function resolveElementOffset(offset) {
+export function resolveHtmlOffset(offset) {
 	if (offset === undefined || offset === null) {
 		return 0
 	}
 
 	if (typeof offset !== 'number' || offset < 0 || !Number.isInteger(offset)) {
-		throw new Error('Element offset must be a non-negative integer')
+		throw new Error('HTML offset must be a non-negative integer')
 	}
 
 	return offset

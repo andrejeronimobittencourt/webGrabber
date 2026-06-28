@@ -4,11 +4,12 @@ export const BUILTIN_AGENT_TOOL_NAMES = [
 	'click',
 	'type',
 	'pressKey',
-	'paginateElements',
+	'paginateHtml',
 	'listTabs',
 	'switchTab',
 	'getElements',
 	'screenshot',
+	'answer',
 ]
 
 /** Agent tools included only when vision is available. */

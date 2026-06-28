@@ -14,20 +14,14 @@ export const EMPTY_ASSISTANT_NUDGE =
 	'Last response had no tool calls and no answer text.'
 
 /** Prefix for the current-page observation user turn. */
-export const OBSERVATION_MESSAGE_PREFIX = 'Current page observation:\n'
+export const OBSERVATION_MESSAGE_PREFIX = '--- SYSTEM ENVIRONMENT STATE: CURRENT PAGE OBSERVATION ---\n'
 
 /** Prefix for the compact tool-call history user turn. */
-export const TOOL_HISTORY_MESSAGE_PREFIX = 'Tools called this run:\n'
+export const TOOL_HISTORY_MESSAGE_PREFIX = '--- SYSTEM ENVIRONMENT STATE: TOOL EXECUTION HISTORY ---\n'
 
 /** Prefix for validation and stall notes from the previous step. */
-export const FEEDBACK_MESSAGE_PREFIX = 'Last step:\n'
+export const FEEDBACK_MESSAGE_PREFIX = '--- SYSTEM ENVIRONMENT STATE: FEEDBACK FROM LAST ACTION ---\n'
 
-/**
- * Nudge used when the model answers in export mode without providing a selector.
- * The model is reminded to respond with the full JSON answer object.
- */
-export const EXPORT_ANSWER_SELECTOR_NUDGE =
-	'Export mode: your answer must be JSON {"answer":"...","selector":"css-selector-from-elements"}. The selector is required.'
 
 /**
  * @param {unknown} observation
@@ -38,16 +32,23 @@ export function buildObservationMessage(observation) {
 		/** @type {import('./observePage.js').PageObservation} */ (observation),
 	)
 
-	return `${OBSERVATION_MESSAGE_PREFIX}${JSON.stringify(payload)}`
+	const isErrorPage =
+		typeof observation.url === 'string' && observation.url.startsWith('chrome-error://')
+
+	const prefix = isErrorPage
+		? 'Navigation hard-failed: the URL could not be loaded (DNS error or unreachable host). Do NOT guess another URL. Go back to a known working page and find a real link to follow.\n'
+		: ''
+
+	return `${prefix}${OBSERVATION_MESSAGE_PREFIX}${JSON.stringify(payload)}`
 }
 
 /**
- * Build a compact tool-history entry. Contains only the tool name, params
- * (with `reason` extracted to its own key), and nothing else — results and
- * errors are intentionally excluded; the model learns from the next observation
- * instead, keeping the context lean and focused.
+ * Build a compact tool-history entry. Contains the tool name, params,
+ * reason, and — critically — a failed flag when the step errored so the
+ * model understands it must correct course rather than blindly continuing.
+ * Results are excluded; the model learns from the next observation instead.
  * @param {AgentStep} step
- * @returns {{ tool: string, params: Record<string, unknown>, reason?: string }}
+ * @returns {{ tool: string, params: Record<string, unknown>, reason?: string, failed?: true }}
  */
 function buildToolHistoryEntry(step) {
 	const { reason, ...actionParams } = step.params ?? {}
@@ -58,6 +59,11 @@ function buildToolHistoryEntry(step) {
 	} else if (typeof reason === 'string' && reason) {
 		// Backwards-compat: reason may have been stored inside params on older steps.
 		entry.reason = reason
+	}
+
+	if (step.error) {
+		entry.failed = true
+		entry.error = step.error
 	}
 
 	return entry
@@ -107,7 +113,7 @@ export function buildAgentModelMessages({
 	/** @type {OllamaChatMessage[]} */
 	const messages = [
 		{ role: 'system', content: buildAgentSystemPrompt(referenceDate, { visionAvailable, exportMode }) },
-		{ role: 'user', content: instruction },
+		{ role: 'user', content: `--- USER GOAL ---\n${instruction}` },
 	]
 
 	if (steps.length > 0) {
@@ -200,7 +206,37 @@ export function formatAgentToolErrorForUser(error) {
  * @returns {boolean}
  */
 export function hasAssistantToolCalls(message) {
-	return Boolean(message.tool_calls?.length)
+	if (message.tool_calls && message.tool_calls.length > 0) {
+		return true
+	}
+
+	// Graceful fallback for models like Gemma that sometimes emit JSON instead of native API calls
+	const content = extractRawContent(message)
+	if (!content) return false
+
+	try {
+		const startIndex = content.indexOf('{')
+		const endIndex = content.lastIndexOf('}')
+		
+		if (startIndex !== -1 && endIndex !== -1 && endIndex > startIndex) {
+			const jsonStr = content.slice(startIndex, endIndex + 1)
+			const parsed = JSON.parse(jsonStr)
+			
+			if (parsed && typeof parsed === 'object' && typeof parsed.tool === 'string') {
+				message.tool_calls = [{
+					function: {
+						name: parsed.tool,
+						arguments: JSON.stringify(parsed.params || {})
+					}
+				}]
+				return true
+			}
+		}
+	} catch (e) {
+		// Ignore parsing errors, it wasn't a valid tool JSON block
+	}
+
+	return false
 }
 
 /**
@@ -229,50 +265,9 @@ function extractRawContent(message) {
 }
 
 /**
- * Parse the final assistant answer. In export mode the model is instructed to reply
- * with JSON `{"answer":"…","selector":"…"}`. If the content is valid JSON with an
- * `answer` key the selector is extracted; otherwise the raw content is used as the
- * answer text and selector is null (graceful degradation).
- *
- * In non-export mode the raw content is returned as-is with a null selector.
- *
- * @param {OllamaChatMessage} message
- * @param {boolean} [exportMode=false]
- * @returns {AssistantAnswer}
- */
-export function resolveAssistantAnswer(message, exportMode = false) {
-	const raw = extractRawContent(message)
-
-	if (exportMode) {
-		try {
-			const parsed = JSON.parse(raw)
-			if (parsed && typeof parsed.answer === 'string') {
-				return {
-					text: parsed.answer.trim(),
-					selector: typeof parsed.selector === 'string' ? parsed.selector : null,
-				}
-			}
-		} catch {
-			// Not JSON — fall through to raw text.
-		}
-	}
-
-	return { text: raw, selector: null }
-}
-
-/**
- * Thin wrapper for backward compatibility with call sites that only need the text.
- * @param {OllamaChatMessage} message
- * @returns {string}
- */
-export function resolveAssistantAnswerText(message) {
-	return resolveAssistantAnswer(message).text
-}
-
-/**
  * @param {OllamaChatMessage} message
  * @returns {boolean}
  */
 export function isEmptyAssistantTurn(message) {
-	return !hasAssistantToolCalls(message) && !resolveAssistantAnswerText(message)
+	return !hasAssistantToolCalls(message) && !extractRawContent(message)
 }

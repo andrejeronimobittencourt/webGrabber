@@ -64,6 +64,7 @@ Agent settings use the `AGENT_*` prefix.
 | `AGENT_ALLOWED_HOSTS` | empty | Comma-separated host allowlist for navigation; empty allows all hosts |
 | `AGENT_MAX_STEPS` | `30` | Maximum steps before the run stops |
 | `AGENT_CACHE_OBSERVATIONS` | `true` | Cache page observations between steps |
+| `AGENT_HTML_PAGE_SIZE` | `100000` | Maximum characters of HTML passed to the model per observation chunk |
 | `AGENT_REASON_THINKING` | `false` | Enable extended reasoning on supported models |
 | `AGENT_REASONING_EFFORT` | `medium` | Reasoning depth when thinking is enabled: `high`, `medium`, `low`, or `max` |
 
