@@ -280,7 +280,7 @@ const INSPECT_ELEMENT_TOOL_DEFINITION = {
 export function buildAgentTools({
 	dynamicTools = [],
 	visionAvailable = false,
-	exportMode: _exportMode = false,
+	exportMode = false,
 } = {}) {
 	const baseTools = [
 		...AGENT_TOOL_DEFINITIONS,
@@ -288,14 +288,24 @@ export function buildAgentTools({
 		...(visionAvailable ? [INSPECT_ELEMENT_TOOL_DEFINITION] : []),
 	]
 
-	return [...baseTools, ...dynamicTools].map((tool) => ({
-		type: tool.type,
-		function: {
-			name: tool.function.name,
-			description: tool.function.description,
-			parameters: structuredClone(tool.function.parameters),
-		},
-	}))
+	return [...baseTools, ...dynamicTools].map((tool) => {
+		const clone = {
+			type: tool.type,
+			function: {
+				name: tool.function.name,
+				description: tool.function.description,
+				parameters: structuredClone(tool.function.parameters),
+			},
+		}
+		
+		if (exportMode && clone.function.name === 'answer') {
+			clone.function.parameters.required.push('selector')
+			clone.function.parameters.properties.selector.description =
+				'The CSS selector that contains the answer data. REQUIRED in export mode.'
+		}
+		
+		return clone
+	})
 }
 
 /**

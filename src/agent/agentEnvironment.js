@@ -16,7 +16,7 @@ export function buildVisionConstraint(visionAvailable) {
 }
 
 const EXPORT_MODE_DESCRIPTION =
-	'Export mode: when you have the answer, respond with JSON {"answer":"your answer text","selector":"the CSS selector that contains the answer data"}. The selector field is required in export mode.'
+	'Export mode: when calling the answer tool, you MUST include the selector parameter indicating the CSS selector that contains the answer data.'
 
 /**
  * @param {boolean} exportMode

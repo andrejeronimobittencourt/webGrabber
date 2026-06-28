@@ -7,6 +7,7 @@ export const AGENT_ONLY_EXPORT_ACTIONS = new Set([
 	'paginateHtml',
 	'listTabs',
 	'switchTab',
+	'answer',
 ])
 
 /** Agent tools omitted from normal CLI progress output. */
